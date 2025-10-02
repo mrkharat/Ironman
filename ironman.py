@@ -98,7 +98,7 @@ with tabs[0]:
     try:
         st.dataframe(df_calendar[['Week','Phase','Total Load']].style.background_gradient(cmap="Greens"))
     except:
-        st.warning("Gradient styling failed. Showing plain table.")
+        st.warning("Matplotlib not installed. Showing plain table.")
         st.dataframe(df_calendar[['Week','Phase','Total Load']])
 
 # ---------------- TAB 2: Weekly Plan ----------------
@@ -110,7 +110,10 @@ with tabs[1]:
     else:
         week_plan = current_week_df.iloc[-1]
         week_plan_display = week_plan[["Run (km)","Bike (km)","Swim (km)","Strength (min)"]].to_frame().T
-        st.dataframe(week_plan_display.style.background_gradient(cmap="Greens"))
+        try:
+            st.dataframe(week_plan_display.style.background_gradient(cmap="Greens"))
+        except:
+            st.dataframe(week_plan_display)
 
 # ---------------- TAB 3: Phase Tracker ----------------
 with tabs[2]:
@@ -122,7 +125,11 @@ with tabs[2]:
         progress_pct=max(0,min(100,(days_done/total_days)*100))
         phase_progress.append({"Phase":pname,"Start":start.date(),"End":end.date(),"Progress (%)":round(progress_pct,1)})
     df_phase=pd.DataFrame(phase_progress)
-    st.dataframe(df_phase.style.background_gradient(subset=['Progress (%)'], cmap="Blues").format({"Progress (%)":"{:.1f}%"}))
+    try:
+        st.dataframe(df_phase.style.background_gradient(subset=['Progress (%)'], cmap="Blues").format({"Progress (%)":"{:.1f}%"}))
+    except:
+        st.warning("Matplotlib not installed. Showing plain table.")
+        st.dataframe(df_phase)
     
     weights = [0.1, 0.4, 0.25, 0.25]
     readiness = sum(df_phase['Progress (%)'] * weights)
@@ -148,7 +155,10 @@ with tabs[3]:
     df_meal_log['Meals Completed'] = df_meal_log[MEALS].sum(axis=1)
     df_meal_log['Meals Adherence (%)'] = df_meal_log['Meals Completed']/len(MEALS)*100
     df_meal_log['Sleep Adherence (%)'] = df_meal_log['Sleep']/1*100
-    st.dataframe(df_meal_log[['Day','Meals Adherence (%)','Sleep Adherence (%)']].style.background_gradient(cmap="Oranges"))
+    try:
+        st.dataframe(df_meal_log[['Day','Meals Adherence (%)','Sleep Adherence (%)']].style.background_gradient(cmap="Oranges"))
+    except:
+        st.dataframe(df_meal_log[['Day','Meals Adherence (%)','Sleep Adherence (%)']])
     st.info(f"Weekly Meals Adherence: {df_meal_log['Meals Adherence (%)'].mean():.1f}% | Sleep Adherence: {df_meal_log['Sleep Adherence (%)'].mean():.1f}%")
 
 # ---------------- TAB 5: Coaching Suggestions ----------------
@@ -186,9 +196,11 @@ with tabs[5]:
             "Readiness (%)":round(readiness,1)
         })
     df_team = pd.DataFrame(team_data)
-    st.subheader("Weekly Training Load & Readiness")
-    st.dataframe(df_team.style.background_gradient(subset=['Run (km)','Bike (km)','Swim (km)','Strength (min)'], cmap='Greens').background_gradient(subset=['Readiness (%)'], cmap='Blues'))
-    
+    try:
+        st.dataframe(df_team.style.background_gradient(subset=['Run (km)','Bike (km)','Swim (km)','Strength (min)'], cmap='Greens').background_gradient(subset=['Readiness (%)'], cmap='Blues'))
+    except:
+        st.dataframe(df_team)
+
     st.subheader("Team Nutrition & Sleep Adherence (Weekly)")
     team_meal_sleep = []
     for member in TEAM:
@@ -208,42 +220,7 @@ with tabs[5]:
             "Avg Sleep Adherence (%)":avg_sleep
         })
     df_team_meal_sleep = pd.DataFrame(team_meal_sleep)
-    st.dataframe(df_team_meal_sleep.style.background_gradient(subset=['Avg Meals Adherence (%)','Avg Sleep Adherence (%)'], cmap='Oranges'))
-    
-    # ---------------- Suggested Actions ----------------
-    st.subheader("Suggested Actions (Weekly)")
-    for member in TEAM:
-        week_df = df_calendar[df_calendar["Week Start"]<=TODAY]
-        if week_df.empty:
-            week_plan = {"Run (km)":0,"Bike (km)":0,"Swim (km)":0,"Strength (min)":0}
-        else:
-            week_plan = week_df.iloc[-1][["Run (km)","Bike (km)","Swim (km)","Strength (min)"]].to_dict()
-        
-        # Meals & Sleep
-        total_meals = 0
-        total_sleep = 0
-        for day in week_days:
-            meals_checked = sum([st.session_state.get(f"{member}_{day}_{meal}",0) for meal in MEALS])
-            sleep_checked = st.session_state.get(f"{member}_{day}_sleep",0)
-            total_meals += meals_checked/len(MEALS)*100
-            total_sleep += sleep_checked/1*100
-        avg_meals = total_meals/len(week_days)
-        avg_sleep = total_sleep/len(week_days)
-        
-        st.markdown(f"**{member}**")
-        load_actual = sum([week_plan["Run (km)"], week_plan["Bike (km)"], week_plan["Swim (km)"], week_plan["Strength (min)"]/10])
-        load_planned = df_calendar[df_calendar["Week Start"]==week_df.iloc[-1]["Week Start"]]["Total Load"].values[0]
-        if load_actual < 0.8*load_planned:
-            st.write("- ⚠️ Increase training load carefully to reach weekly target.")
-        elif load_actual > 1.2*load_planned:
-            st.write("- ⚠️ Training load high! Reduce intensity to avoid overtraining.")
-        else:
-            st.write("- ✅ Training load on track.")
-        if avg_meals < 80:
-            st.write("- ⚠️ Focus on nutrition this week.")
-        else:
-            st.write("- ✅ Good nutrition adherence.")
-        if avg_sleep < 80:
-            st.write("- ⚠️ Increase sleep hours for better recovery.")
-        else:
-            st.write("- ✅ Sleep on track.")
+    try:
+        st.dataframe(df_team_meal_sleep.style.background_gradient(subset=['Avg Meals Adherence (%)','Avg Sleep Adherence (%)'], cmap='Oranges'))
+    except:
+        st.dataframe(df_team_meal_sleep)
