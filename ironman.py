@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # ---------------- Sidebar ----------------
-st.sidebar.image("https://github.com/mrkharat/Ironman/blob/main/Ironman-Logo.jpg", use_column_width=True)
+st.sidebar.image("https://raw.githubusercontent.com/mrkharat/Ironman/main/Ironman-Logo.jpg", use_column_width=True)
 st.sidebar.title("Ironman Coaching Dashboard")
 TEAM = ["Mayur","Sudeep","Vaishali"]
 athlete = st.sidebar.selectbox("Select Athlete", TEAM)
@@ -96,9 +96,13 @@ with tabs[0]:
 # ---------------- TAB 2: Weekly Plan ----------------
 with tabs[1]:
     st.header(f"{athlete} - Current Week Training Plan")
-    week_plan = df_calendar[df_calendar["Week Start"]<=TODAY].iloc[-1]
-    st.write(f"Week Start: {week_plan['Week']}, Phase: {week_plan['Phase']}")
-    st.dataframe(week_plan[["Run (km)","Bike (km)","Swim (km)","Strength (min)"]])
+    current_week_df = df_calendar[df_calendar["Week Start"]<=TODAY]
+    if current_week_df.empty:
+        st.warning("Today's date is before the start of the training plan.")
+    else:
+        week_plan = current_week_df.iloc[-1]
+        st.write(f"Week Start: {week_plan['Week']}, Phase: {week_plan['Phase']}")
+        st.dataframe(week_plan[["Run (km)","Bike (km)","Swim (km)","Strength (min)"]])
 
 # ---------------- TAB 3: Phase Tracker ----------------
 with tabs[2]:
