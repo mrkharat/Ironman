@@ -1,13 +1,12 @@
-# ---------------- Ironman 2025-2028 3-Year Calendar Dashboard ----------------
+# ---------------- Ironman 2025-2028 Coaching Dashboard ----------------
 import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import plotly.express as px
 
 # ---------------- App Config ----------------
 st.set_page_config(
-    page_title="Ironman 2025-2028 Coaching Calendar",
+    page_title="Ironman 2025-2028 Coaching",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -41,7 +40,6 @@ def generate_weekly_plan(phase):
 # ---------------- Meal & Sleep Generator ----------------
 MEALS = ["Pre-Breakfast","Breakfast","Mid-Morning Snack","Lunch",
          "Pre-Workout","Post-Workout","Evening Snack","Dinner","Before Bed"]
-
 SLEEP_HOURS = 7.5
 
 # ---------------- Generate 3-Year Calendar ----------------
@@ -50,7 +48,6 @@ end_date = pd.Timestamp("2028-07-31")
 weeks = pd.date_range(start=start_date,end=end_date,freq='W-MON')  # Mondays as week start
 
 calendar_data = []
-
 for week_start in weeks:
     # Determine phase
     phase = None
@@ -61,7 +58,6 @@ for week_start in weeks:
     if not phase:
         phase = "Base Phase"
     plan = generate_weekly_plan(phase)
-    # Simulate adherence placeholder (0-100%) initially 0
     calendar_data.append({
         "Week Start":week_start,
         "Phase":phase,
@@ -79,20 +75,24 @@ df_calendar["Week"] = df_calendar["Week Start"].dt.strftime("%Y-%m-%d")
 # ---------------- Tabs ----------------
 tabs = st.tabs(["3-Year Calendar","Weekly Plan","Phase Tracker","Meal & Sleep Log","Coaching Suggestions"])
 
-# ---------------- TAB 1: 3-Year Calendar Heatmap ----------------
+# ---------------- TAB 1: 3-Year Calendar (Colored Table) ----------------
 with tabs[0]:
-    st.header(f"{athlete} - 3-Year Training Calendar (Heatmap)")
-    st.info("Color intensity shows planned training volume. Update adherence in Meal & Sleep Log tab.")
+    st.header(f"{athlete} - 3-Year Training Calendar (Colored Table)")
+    st.info("Cells color intensity shows total training load. Green=High, Yellow=Medium, Red=Low")
     
-    # Example: Create total weekly load as sum of all activities
     df_calendar['Total Load'] = df_calendar["Run (km)"] + df_calendar["Bike (km)"] + df_calendar["Swim (km)"] + df_calendar["Strength (min)"]/10
-    fig = px.imshow([df_calendar['Total Load'].values.reshape(-1,1)], 
-                    labels=dict(x="Week", y="", color="Load"),
-                    x=df_calendar['Week'],
-                    y=["Weekly Load"],
-                    color_continuous_scale='Greens')
-    st.plotly_chart(fig, use_container_width=True)
     
+    def color_load(val):
+        if val==0:
+            color = 'red'
+        elif val<30:
+            color='yellow'
+        else:
+            color='green'
+        return f'background-color: {color}'
+    
+    st.dataframe(df_calendar[['Week','Phase','Total Load']].style.applymap(color_load, subset=['Total Load']))
+
 # ---------------- TAB 2: Weekly Plan ----------------
 with tabs[1]:
     st.header(f"{athlete} - Current Week Training Plan")
