@@ -1,200 +1,148 @@
+# ---------------- Ironman 2025-2028 3-Year Calendar Dashboard ----------------
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date
-import os
+import numpy as np
+from datetime import datetime, timedelta
+import plotly.express as px
 
-# ---------------- Config ----------------
-st.set_page_config(page_title="Ironman Team Coach", layout="wide")
-TEAM = ["Mayur (M)", "Sudeep (M)", "Vaishali (F)"]
-TODAY = datetime.today()
-PHASES = {
-    "Base Phase": (datetime(2025,10,1), datetime(2025,12,31)),
-    "Endurance Build (Goa 70.3 2026)": (datetime(2026,1,1), datetime(2026,12,31)),
-    "Strength & Long Distance 2027": (datetime(2027,1,1), datetime(2027,12,31)),
-    "Peak Ironman Prep 2028": (datetime(2028,1,1), datetime(2028,7,31))
-}
-
-# ---------------- Data files ----------------
-DATA_DIR = "team_data"
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
-
-PROGRESS_FILE = os.path.join(DATA_DIR, "progress.csv")
-NUTRITION_FILE = os.path.join(DATA_DIR, "nutrition.csv")
-SLEEP_FILE = os.path.join(DATA_DIR, "sleep.csv")
-
-def ensure_file(path, cols):
-    if not os.path.exists(path):
-        pd.DataFrame(columns=cols).to_csv(path, index=False)
-
-ensure_file(PROGRESS_FILE, ["Date","Athlete","Discipline","Task","Done"])
-ensure_file(NUTRITION_FILE, ["Date","Athlete","Meal Time","Food/Drink","Quantity","Remarks"])
-ensure_file(SLEEP_FILE, ["Date","Athlete","Sleep_Hours","Bedtime","Wakeup","Remarks"])
-
-# ---------------- Phase Logic ----------------
-def get_phase(today):
-    for k,v in PHASES.items():
-        if v[0] <= today <= v[1]:
-            return k
-    return "Recovery / Maintenance"
-
-def get_weekly_plan(phase):
-    """Return weekly training, nutrition, sleep guidance"""
-    if phase=="Base Phase":
-        return {
-            "Run":"3x 5–7km + 1 long run 10–15km",
-            "Swim":"2 sessions 200–400m (technique)",
-            "Bike":"Short rides starting Dec 20–30km",
-            "Strength":"1–2 sessions (core, mobility)",
-            "Nutrition":"Balanced meals, reduce sugar",
-            "Sleep":"7–8 hrs, consistent bedtime"
-        }
-    if phase=="Endurance Build (Goa 70.3 2026)":
-        return {
-            "Run":"Weekly long run 25–30 km",
-            "Swim":"2–3 sessions up to 2 km",
-            "Bike":"Long rides 60–80 km, practice nutrition",
-            "Strength":"1 session/week",
-            "Nutrition":"Carb focus before long workouts",
-            "Sleep":"7–8 hrs, early night before long training"
-        }
-    if phase=="Strength & Long Distance 2027":
-        return {
-            "Run":"Long runs 30–35 km, tempo sessions",
-            "Swim":"Build to 2.5 km continuous",
-            "Bike":"100–120 km long rides",
-            "Strength":"2 sessions/week",
-            "Nutrition":"Hydration + carb timing",
-            "Sleep":"7–9 hrs, recovery-focused"
-        }
-    if phase=="Peak Ironman Prep 2028":
-        return {
-            "Run":"38–40 km long runs, brick workouts",
-            "Swim":"3–3.8 km open water",
-            "Bike":"150–180 km rides",
-            "Strength":"Maintain mobility",
-            "Nutrition":"Race fuel practice, carb load",
-            "Sleep":"8–9 hrs, early bedtime before race simulations"
-        }
-    return {
-        "Run":"Easy recovery runs 5–10 km",
-        "Swim":"Light technique swims",
-        "Bike":"Short spins",
-        "Strength":"Yoga / mobility",
-        "Nutrition":"Balanced diet",
-        "Sleep":"7–8 hrs"
-    }
-
-# ---------------- Load & Save Helpers ----------------
-def load_csv(path):
-    return pd.read_csv(path)
-
-def save_csv(df,path):
-    df.to_csv(path,index=False)
+# ---------------- App Config ----------------
+st.set_page_config(
+    page_title="Ironman 2025-2028 Coaching Calendar",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # ---------------- Sidebar ----------------
-st.sidebar.title("Team Ironman Coach")
+st.sidebar.image("https://github.com/mrkharat/Ironman/blob/main/Ironman-Logo.jpg", use_column_width=True)
+st.sidebar.title("Ironman Coaching Dashboard")
+TEAM = ["Mayur","Sudeep","Vaishali"]
 athlete = st.sidebar.selectbox("Select Athlete", TEAM)
-phase = get_phase(TODAY)
-st.sidebar.info(f"Current Phase: **{phase}**")
-race_day = date(2028,7,9)
-days_left = (race_day - TODAY.date()).days
-st.sidebar.success(f"Days to Ironman Hamburg 2028: **{days_left}**")
+TODAY = pd.Timestamp(datetime.today().date())
+
+# ---------------- Phases ----------------
+PHASES = {
+    "Base Phase":[pd.Timestamp("2025-10-01"), pd.Timestamp("2025-12-31")],
+    "Endurance Build":[pd.Timestamp("2026-01-01"), pd.Timestamp("2027-06-30")],
+    "Strength & Long Distance":[pd.Timestamp("2027-07-01"), pd.Timestamp("2027-12-31")],
+    "Peak Ironman Prep":[pd.Timestamp("2028-01-01"), pd.Timestamp("2028-07-31")]
+}
+
+# ---------------- Weekly Plan Generator ----------------
+def generate_weekly_plan(phase):
+    if phase=="Base Phase":
+        return {"Run":5,"Bike":10,"Swim":1,"Strength":20}
+    elif phase=="Endurance Build":
+        return {"Run":10,"Bike":25,"Swim":2,"Strength":20}
+    elif phase=="Strength & Long Distance":
+        return {"Run":15,"Bike":35,"Swim":3,"Strength":30}
+    else:
+        return {"Run":20,"Bike":45,"Swim":4,"Strength":30}
+
+# ---------------- Meal & Sleep Generator ----------------
+MEALS = ["Pre-Breakfast","Breakfast","Mid-Morning Snack","Lunch",
+         "Pre-Workout","Post-Workout","Evening Snack","Dinner","Before Bed"]
+
+SLEEP_HOURS = 7.5
+
+# ---------------- Generate 3-Year Calendar ----------------
+start_date = pd.Timestamp("2025-10-01")
+end_date = pd.Timestamp("2028-07-31")
+weeks = pd.date_range(start=start_date,end=end_date,freq='W-MON')  # Mondays as week start
+
+calendar_data = []
+
+for week_start in weeks:
+    # Determine phase
+    phase = None
+    for pname,(start,end) in PHASES.items():
+        if start <= week_start <= end:
+            phase = pname
+            break
+    if not phase:
+        phase = "Base Phase"
+    plan = generate_weekly_plan(phase)
+    # Simulate adherence placeholder (0-100%) initially 0
+    calendar_data.append({
+        "Week Start":week_start,
+        "Phase":phase,
+        "Run (km)":plan["Run"],
+        "Bike (km)":plan["Bike"],
+        "Swim (km)":plan["Swim"],
+        "Strength (min)":plan["Strength"],
+        "Meals Adherence (%)":0,
+        "Sleep Adherence (%)":0
+    })
+
+df_calendar = pd.DataFrame(calendar_data)
+df_calendar["Week"] = df_calendar["Week Start"].dt.strftime("%Y-%m-%d")
 
 # ---------------- Tabs ----------------
-tabs = st.tabs(["Weekly Plan & Check", "Nutrition Log", "Sleep Log", "Team Leaderboard"])
+tabs = st.tabs(["3-Year Calendar","Weekly Plan","Phase Tracker","Meal & Sleep Log","Coaching Suggestions"])
 
-weekly_plan = get_weekly_plan(phase)
-
-# ---------------- Tab 1: Weekly Plan ----------------
+# ---------------- TAB 1: 3-Year Calendar Heatmap ----------------
 with tabs[0]:
-    st.header(f"Weekly Coach Plan — {phase}")
-    st.markdown("### This Week's Activities & Tasks")
-    df_prog = load_csv(PROGRESS_FILE)
-    today_str = str(TODAY.date())
-    tasks=[]
-    for disc, task_text in weekly_plan.items():
-        if disc in ["Nutrition","Sleep"]:
-            continue
-        existing = df_prog[(df_prog["Date"]==today_str)&(df_prog["Athlete"]==athlete)&(df_prog["Discipline"]==disc)]
-        init=False
-        if not existing.empty:
-            init=bool(existing.iloc[-1]["Done"])
-        done = st.checkbox(f"{disc}: {task_text}", value=init, key=f"{athlete}_{disc}_{today_str}")
-        tasks.append({"Date":today_str,"Athlete":athlete,"Discipline":disc,"Task":task_text,"Done":int(done)})
-    if st.button("Save Today's Activity"):
-        df_prog = df_prog[~((df_prog["Date"]==today_str)&(df_prog["Athlete"]==athlete))]
-        df_prog = pd.concat([df_prog,pd.DataFrame(tasks)],ignore_index=True)
-        save_csv(df_prog,PROGRESS_FILE)
-        st.success("Saved activity progress")
-
-    st.markdown("### Weekly Nutrition & Sleep Guidance")
-    st.write(f"- **Nutrition**: {weekly_plan['Nutrition']}")
-    st.write(f"- **Sleep**: {weekly_plan['Sleep']}")
-
-# ---------------- Tab 2: Nutrition ----------------
+    st.header(f"{athlete} - 3-Year Training Calendar (Heatmap)")
+    st.info("Color intensity shows planned training volume. Update adherence in Meal & Sleep Log tab.")
+    
+    # Example: Create total weekly load as sum of all activities
+    df_calendar['Total Load'] = df_calendar["Run (km)"] + df_calendar["Bike (km)"] + df_calendar["Swim (km)"] + df_calendar["Strength (min)"]/10
+    fig = px.imshow([df_calendar['Total Load'].values.reshape(-1,1)], 
+                    labels=dict(x="Week", y="", color="Load"),
+                    x=df_calendar['Week'],
+                    y=["Weekly Load"],
+                    color_continuous_scale='Greens')
+    st.plotly_chart(fig, use_container_width=True)
+    
+# ---------------- TAB 2: Weekly Plan ----------------
 with tabs[1]:
-    st.header("Nutrition Log")
-    df_nut = load_csv(NUTRITION_FILE)
-    col1,col2,col3 = st.columns(3)
-    with col1:
-        nut_date = st.date_input("Date", value=TODAY.date())
-        meal_time = st.selectbox("Meal time", ["Breakfast","Mid-morning","Lunch","Snack","Pre-workout","Post-workout","Dinner","Other"])
-    with col2:
-        food = st.text_input("Food / Drink")
-        qty = st.text_input("Quantity","e.g., 1 bowl, 2 slices")
-    with col3:
-        remarks = st.text_input("Remarks / Calories / Feel")
-        if st.button("Add Nutrition Entry"):
-            df_nut = load_csv(NUTRITION_FILE)
-            df_nut = pd.concat([df_nut,pd.DataFrame([{
-                "Date":str(nut_date),
-                "Athlete":athlete,
-                "Meal Time":meal_time,
-                "Food/Drink":food,
-                "Quantity":qty,
-                "Remarks":remarks
-            }])],ignore_index=True)
-            save_csv(df_nut,NUTRITION_FILE)
-            st.success("Nutrition entry added")
-    st.dataframe(df_nut[df_nut["Athlete"]==athlete].sort_values("Date",ascending=False).head(20))
+    st.header(f"{athlete} - Current Week Training Plan")
+    week_plan = df_calendar[df_calendar["Week Start"]<=TODAY].iloc[-1]
+    st.write(f"Week Start: {week_plan['Week']}, Phase: {week_plan['Phase']}")
+    st.dataframe(week_plan[["Run (km)","Bike (km)","Swim (km)","Strength (min)"]])
 
-# ---------------- Tab 3: Sleep ----------------
+# ---------------- TAB 3: Phase Tracker ----------------
 with tabs[2]:
-    st.header("Sleep Log")
-    df_sleep = load_csv(SLEEP_FILE)
-    col1,col2,col3 = st.columns([1,1,1])
-    with col1:
-        sleep_date = st.date_input("Date", value=TODAY.date(), key="sleep_date")
-        sleep_hours = st.number_input("Hours slept", 0.0,12.0,7.5,0.5)
-    with col2:
-        bedtime = st.time_input("Bedtime", key="bedtime")
-    with col3:
-        wakeup = st.time_input("Wakeup", key="wakeup")
-        remarks = st.text_input("Remarks")
-        if st.button("Save Sleep Entry"):
-            df_sleep = load_csv(SLEEP_FILE)
-            df_sleep = pd.concat([df_sleep,pd.DataFrame([{
-                "Date":str(sleep_date),
-                "Athlete":athlete,
-                "Sleep_Hours":sleep_hours,
-                "Bedtime":bedtime.strftime("%H:%M"),
-                "Wakeup":wakeup.strftime("%H:%M"),
-                "Remarks":remarks
-            }])],ignore_index=True)
-            save_csv(df_sleep,SLEEP_FILE)
-            st.success("Sleep entry saved")
-    st.dataframe(df_sleep[df_sleep["Athlete"]==athlete].sort_values("Date",ascending=False).head(10))
+    st.header(f"{athlete} - Phase Progression Tracker")
+    phase_progress=[]
+    for pname,(start,end) in PHASES.items():
+        total_days=(end-start).days+1
+        days_done=(min(TODAY,end)-start).days+1
+        progress_pct=max(0,min(100,(days_done/total_days)*100))
+        phase_progress.append({"Phase":pname,"Start":start.date(),"End":end.date(),"Progress (%)":round(progress_pct,1)})
+    df_phase=pd.DataFrame(phase_progress)
+    st.dataframe(df_phase)
+    readiness = sum([row['Progress (%)']*w for row,w in zip(df_phase.itertuples(), [0.1,0.4,0.25,0.25])])
+    st.info(f"Estimated Ironman 2028 Readiness: {readiness:.1f}%")
 
-# ---------------- Tab 4: Team Leaderboard ----------------
+# ---------------- TAB 4: Meal & Sleep Log ----------------
 with tabs[3]:
-    st.header("Team Leaderboard & Consistency")
-    df_prog = load_csv(PROGRESS_FILE)
-    if df_prog.empty:
-        st.info("No progress yet for team")
-    else:
-        leaderboard = df_prog.groupby("Athlete")["Done"].mean().reset_index()
-        leaderboard["Consistency %"] = (leaderboard["Done"]*100).round(1)
-        st.bar_chart(leaderboard.set_index("Athlete")["Consistency %"])
-        st.subheader("Recent Activity Log")
-        st.dataframe(df_prog.sort_values(["Date","Athlete"],ascending=[False,True]).head(50))
+    st.header(f"{athlete} - Weekly Meal & Sleep Tracking")
+    week_days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+    MEAL_LOG = []
+    for day in week_days:
+        st.markdown(f"### {day}")
+        daily_log = {}
+        for meal in MEALS:
+            key = f"{athlete}_{day}_{meal}"
+            checked = st.checkbox(f"{meal}", key=key)
+            daily_log[meal] = int(checked)
+        sleep_key = f"{athlete}_{day}_sleep"
+        slept = st.checkbox(f"Sleep (~{SLEEP_HOURS} hrs)", key=sleep_key)
+        daily_log["Sleep"] = int(slept)
+        MEAL_LOG.append({"Day":day, **daily_log})
+    df_meal_log = pd.DataFrame(MEAL_LOG)
+    df_meal_log['Meals Completed'] = df_meal_log[MEALS].sum(axis=1)
+    df_meal_log['Meals Adherence (%)'] = df_meal_log['Meals Completed']/len(MEALS)*100
+    df_meal_log['Sleep Adherence (%)'] = df_meal_log['Sleep']/1*100
+    st.dataframe(df_meal_log[['Day','Meals Adherence (%)','Sleep Adherence (%)']])
+    weekly_meals = df_meal_log['Meals Adherence (%)'].mean()
+    weekly_sleep = df_meal_log['Sleep Adherence (%)'].mean()
+    st.info(f"Weekly Meals Adherence: {weekly_meals:.1f}% | Sleep Adherence: {weekly_sleep:.1f}%")
+
+# ---------------- TAB 5: Coaching Suggestions ----------------
+with tabs[4]:
+    st.header(f"{athlete} - Weekly Coaching Suggestions")
+    st.write("- Gradually increase mileage by 5–10% per week to avoid injuries.")
+    st.write("- Incorporate brick sessions (Bike→Run) starting Endurance Build phase.")
+    st.write("- Track sleep & meals consistently; low adherence may reduce next week's intensity.")
+    st.write("- Monitor fatigue and adjust strength sessions if needed.")
