@@ -115,7 +115,10 @@ with tabs[2]:
         phase_progress.append({"Phase":pname,"Start":start.date(),"End":end.date(),"Progress (%)":round(progress_pct,1)})
     df_phase=pd.DataFrame(phase_progress)
     st.dataframe(df_phase)
-    readiness = sum([row['Progress (%)']*w for row,w in zip(df_phase.itertuples(), [0.1,0.4,0.25,0.25])])
+    
+    # Corrected readiness calculation using df directly
+    weights = [0.1, 0.4, 0.25, 0.25]
+    readiness = sum(df_phase['Progress (%)'] * weights)
     st.info(f"Estimated Ironman 2028 Readiness: {readiness:.1f}%")
 
 # ---------------- TAB 4: Meal & Sleep Log ----------------
