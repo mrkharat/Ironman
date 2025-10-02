@@ -3,6 +3,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from PIL import Image
+import requests
+from io import BytesIO
 
 # ---------------- App Config ----------------
 st.set_page_config(
@@ -11,10 +14,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---------------- Sidebar ----------------
-st.sidebar.image("https://raw.githubusercontent.com/mrkharat/Ironman/main/Ironman-Logo.jpg", use_column_width=True)
+# ---------------- Sidebar with Logo ----------------
+logo_url = "https://raw.githubusercontent.com/mrkharat/Ironman/main/Ironman-Logo.jpg"
+try:
+    response = requests.get(logo_url)
+    img = Image.open(BytesIO(response.content))
+    st.sidebar.image(img, use_column_width=True)
+except:
+    st.sidebar.write("🏊 Ironman Coach")
 st.sidebar.title("Ironman Coaching Dashboard")
 
+# ---------------- Team and Athlete ----------------
 TEAM = ["Mayur","Sudeep","Vaishali"]
 athlete = st.sidebar.selectbox("Select Athlete", TEAM)
 TODAY = pd.Timestamp(datetime.today().date())
@@ -51,7 +61,7 @@ SLEEP_HOURS = 7.5
 # ---------------- Generate 3-Year Calendar ----------------
 start_date = pd.Timestamp("2025-10-01")
 end_date = pd.Timestamp("2028-07-31")
-weeks = pd.date_range(start=start_date,end=end_date,freq='W-MON')  # Mondays as week start
+weeks = pd.date_range(start=start_date,end=end_date,freq='W-MON')
 
 calendar_data = []
 for week_start in weeks:
@@ -85,7 +95,11 @@ tabs = st.tabs(["3-Year Calendar","Weekly Plan","Phase Tracker","Meal & Sleep Lo
 with tabs[0]:
     st.header(f"{athlete} - 3-Year Training Calendar")
     st.info("Total weekly load heatmap: green=high, yellow=medium, red=low")
-    st.dataframe(df_calendar[['Week','Phase','Total Load']].style.background_gradient(cmap="Greens"))
+    try:
+        st.dataframe(df_calendar[['Week','Phase','Total Load']].style.background_gradient(cmap="Greens"))
+    except:
+        st.warning("Gradient styling failed. Showing plain table.")
+        st.dataframe(df_calendar[['Week','Phase','Total Load']])
 
 # ---------------- TAB 2: Weekly Plan ----------------
 with tabs[1]:
