@@ -58,7 +58,7 @@ MEALS = ["Pre-Breakfast","Breakfast","Mid-Morning Snack","Lunch",
          "Pre-Workout","Post-Workout","Evening Snack","Dinner","Before Bed"]
 SLEEP_HOURS = 7.5
 
-# ---------------- Generate 3-Year Calendar ----------------
+# ---------------- Generate Weekly Data ----------------
 start_date = pd.Timestamp("2025-10-01")
 end_date = pd.Timestamp("2028-07-31")
 weeks = pd.date_range(start=start_date,end=end_date,freq='W-MON')
@@ -79,30 +79,17 @@ for week_start in weeks:
         "Run (km)":plan["Run"],
         "Bike (km)":plan["Bike"],
         "Swim (km)":plan["Swim"],
-        "Strength (min)":plan["Strength"],
-        "Meals Adherence (%)":0,
-        "Sleep Adherence (%)":0
+        "Strength (min)":plan["Strength"]
     })
 
 df_calendar = pd.DataFrame(calendar_data)
 df_calendar["Week"] = df_calendar["Week Start"].dt.strftime("%Y-%m-%d")
-df_calendar['Total Load'] = df_calendar["Run (km)"] + df_calendar["Bike (km)"] + df_calendar["Swim (km)"] + df_calendar["Strength (min)"]/10
 
 # ---------------- Tabs ----------------
-tabs = st.tabs(["3-Year Calendar","Weekly Plan","Phase Tracker","Meal & Sleep Log","Coaching Suggestions","Team Dashboard"])
+tabs = st.tabs(["Weekly Plan","Phase Tracker","Meal & Sleep Log","Coaching Suggestions","Team Dashboard"])
 
-# ---------------- TAB 1: 3-Year Calendar ----------------
+# ---------------- TAB 1: Weekly Plan ----------------
 with tabs[0]:
-    st.header(f"{athlete} - 3-Year Training Calendar")
-    st.info("Total weekly load heatmap: green=high, yellow=medium, red=low")
-    try:
-        st.dataframe(df_calendar[['Week','Phase','Total Load']].style.background_gradient(cmap="Greens"))
-    except:
-        st.warning("Matplotlib not installed. Showing plain table.")
-        st.dataframe(df_calendar[['Week','Phase','Total Load']])
-
-# ---------------- TAB 2: Weekly Plan ----------------
-with tabs[1]:
     st.header(f"{athlete} - Current Week Training Plan")
     current_week_df = df_calendar[df_calendar["Week Start"]<=TODAY]
     if current_week_df.empty:
@@ -115,8 +102,8 @@ with tabs[1]:
         except:
             st.dataframe(week_plan_display)
 
-# ---------------- TAB 3: Phase Tracker ----------------
-with tabs[2]:
+# ---------------- TAB 2: Phase Tracker ----------------
+with tabs[1]:
     st.header(f"{athlete} - Phase Progression Tracker")
     phase_progress=[]
     for pname,(start,end) in PHASES.items():
@@ -135,8 +122,8 @@ with tabs[2]:
     readiness = sum(df_phase['Progress (%)'] * weights)
     st.info(f"Estimated Ironman 2028 Readiness: {readiness:.1f}%")
 
-# ---------------- TAB 4: Meal & Sleep Log ----------------
-with tabs[3]:
+# ---------------- TAB 3: Meal & Sleep Log ----------------
+with tabs[2]:
     st.header(f"{athlete} - Weekly Meal & Sleep Tracking")
     week_days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
     MEAL_LOG = []
@@ -161,16 +148,16 @@ with tabs[3]:
         st.dataframe(df_meal_log[['Day','Meals Adherence (%)','Sleep Adherence (%)']])
     st.info(f"Weekly Meals Adherence: {df_meal_log['Meals Adherence (%)'].mean():.1f}% | Sleep Adherence: {df_meal_log['Sleep Adherence (%)'].mean():.1f}%")
 
-# ---------------- TAB 5: Coaching Suggestions ----------------
-with tabs[4]:
+# ---------------- TAB 4: Coaching Suggestions ----------------
+with tabs[3]:
     st.header(f"{athlete} - Weekly Coaching Suggestions")
     st.write("- Gradually increase mileage by 5–10% per week to avoid injuries.")
     st.write("- Incorporate brick sessions (Bike→Run) starting Endurance Build phase.")
     st.write("- Track sleep & meals consistently; low adherence may reduce next week's intensity.")
     st.write("- Monitor fatigue and adjust strength sessions if needed.")
 
-# ---------------- TAB 6: Team Dashboard ----------------
-with tabs[5]:
+# ---------------- TAB 5: Team Dashboard ----------------
+with tabs[4]:
     st.header("Team Dashboard - Weekly Overview")
     team_data = []
     for member in TEAM:
@@ -200,27 +187,3 @@ with tabs[5]:
         st.dataframe(df_team.style.background_gradient(subset=['Run (km)','Bike (km)','Swim (km)','Strength (min)'], cmap='Greens').background_gradient(subset=['Readiness (%)'], cmap='Blues'))
     except:
         st.dataframe(df_team)
-
-    st.subheader("Team Nutrition & Sleep Adherence (Weekly)")
-    team_meal_sleep = []
-    for member in TEAM:
-        total_meals = 0
-        total_sleep = 0
-        total_days = len(week_days)
-        for day in week_days:
-            meals_checked = sum([st.session_state.get(f"{member}_{day}_{meal}",0) for meal in MEALS])
-            sleep_checked = st.session_state.get(f"{member}_{day}_sleep",0)
-            total_meals += meals_checked/len(MEALS)*100
-            total_sleep += sleep_checked/1*100
-        avg_meals = round(total_meals/total_days,1)
-        avg_sleep = round(total_sleep/total_days,1)
-        team_meal_sleep.append({
-            "Athlete":member,
-            "Avg Meals Adherence (%)":avg_meals,
-            "Avg Sleep Adherence (%)":avg_sleep
-        })
-    df_team_meal_sleep = pd.DataFrame(team_meal_sleep)
-    try:
-        st.dataframe(df_team_meal_sleep.style.background_gradient(subset=['Avg Meals Adherence (%)','Avg Sleep Adherence (%)'], cmap='Oranges'))
-    except:
-        st.dataframe(df_team_meal_sleep)
