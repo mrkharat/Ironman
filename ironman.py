@@ -16,7 +16,6 @@ st.sidebar.title("Ironman Dashboard")
 TODAY = datetime.datetime.now()
 race_day = datetime.datetime(2025, 8, 17)  # Example: Hamburg race date
 days_left = (race_day - TODAY).days
-
 st.sidebar.metric("🏁 Race Day Countdown", f"{days_left} days")
 
 # -------------------- User Profile --------------------
@@ -45,21 +44,25 @@ else:
 st.markdown(f"## {greet}, {athlete}! 👋")
 st.markdown(f"### Today: {TODAY.strftime('%A, %d %B %Y')}")
 
+# Select today's training week safely
 today_week_df = df_calendar[df_calendar["Week Start"] <= TODAY]
 
 if today_week_df.empty:
     st.warning("Today's date is before the training plan start.")
 else:
     today_plan = today_week_df.iloc[-1]
+
     st.markdown("### 🏋️ Today's Training Plan")
-    st.dataframe(
-        pd.DataFrame({
-            "Activity":["Run (km)","Bike (km)","Swim (km)","Strength (min)"],
-            "Target":[today_plan["Run (km)"], today_plan["Bike (km)"], today_plan["Swim (km)"], today_plan["Strength (min)"]]
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
+    df_today = pd.DataFrame({
+        "Activity": ["Run (km)", "Bike (km)", "Swim (km)", "Strength (min)"],
+        "Target": [
+            today_plan["Run (km)"],
+            today_plan["Bike (km)"],
+            today_plan["Swim (km)"],
+            today_plan["Strength (min)"]
+        ]
+    })
+    st.dataframe(df_today, use_container_width=True)
 
     st.markdown("### 🍎 Nutrition & Sleep Recommendation")
     st.write(f"- Meals: {', '.join(MEALS)}")
@@ -84,7 +87,9 @@ with tab2:
     })
     st.dataframe(df_phase, use_container_width=True)
 
-    readiness = sum([row[2]*w for row,w in zip(df_phase.itertuples(), [0.1,0.4,0.25,0.25])])
+    # safer readiness calculation
+    weights = [0.1, 0.4, 0.25, 0.25]
+    readiness = sum([p * w for p, w in zip(df_phase["Progress (%)"], weights)])
     st.metric("Readiness Score", f"{readiness:.1f} %")
 
 with tab3:
