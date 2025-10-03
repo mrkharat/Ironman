@@ -1,5 +1,4 @@
 # ironman_tracker_fixed.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,27 +8,17 @@ import pytz
 import random
 
 # ---------------------- SETTINGS ----------------------
-st.set_page_config(page_title="Ironman 2028 Coach", layout="wide", initial_sidebar_state="expanded", page_icon=None)
+st.set_page_config(page_title="Ironman 2028 Coach", layout="wide", initial_sidebar_state="expanded")
 DATA_DIR = "athlete_data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---------------------- DARK THEME ----------------------
 st.markdown("""
 <style>
-body {
-    background-color: #0E1117;
-    color: #FFFFFF;
-}
-.stButton>button {
-    background-color: #1F2A40;
-    color: #FFFFFF;
-}
-.stCheckbox>div>label {
-    color: #FFFFFF;
-}
-.stDataFrame th {
-    color: #FFFFFF;
-}
+body { background-color: #0E1117; color: #FFFFFF; }
+.stButton>button { background-color: #1F2A40; color: #FFFFFF; }
+.stCheckbox>div>label { color: #FFFFFF; }
+.stDataFrame th { color: #FFFFFF; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -42,7 +31,7 @@ ATHLETES = {
 
 # ---------------------- IRONMAN DATE ----------------------
 tz = pytz.timezone('Asia/Kolkata')
-ironman_date = tz.localize(datetime(2028, 7, 14, 6, 0, 0))  # Hamburg
+ironman_date = tz.localize(datetime(2028, 7, 14, 6, 0, 0))
 now = datetime.now(tz)
 
 # ---------------------- QUOTES & SUNDAY ACTIVITIES ----------------------
@@ -122,13 +111,12 @@ data_file = os.path.join(DATA_DIR, f"{athlete_name}_log.csv")
 if os.path.exists(data_file):
     df_log = pd.read_csv(data_file, parse_dates=["Date"])
 else:
-    # Initialize log
     df_log = pd.DataFrame(columns=["Date","Phase","Activity","Nutrition","Sleep","Weight","Recovery"])
     df_log.to_csv(data_file,index=False)
 
 # ---------------------- PHASE CALCULATION ----------------------
 phases = ["Base","Build","Peak","Taper"]
-phase_weeks = {"Base":20,"Build":40,"Peak":20,"Taper":10}  # approx
+phase_weeks = {"Base":20,"Build":40,"Peak":20,"Taper":10}
 
 total_weeks = sum(phase_weeks.values())
 week_number = ((now - tz.localize(datetime(2025,10,1,0,0,0))).days)//7 +1
@@ -144,7 +132,6 @@ else:
 def generate_daily_plan(athlete, today):
     weight = ATHLETES[athlete]["weight"]
     weekday = today.weekday()
-    # Phase based distances
     if current_phase=="Base":
         run_km = 5 + 0.1*week_number
         bike_km = 0
@@ -157,7 +144,7 @@ def generate_daily_plan(athlete, today):
         run_km = 15 + 0.2*week_number
         bike_km = 40
         swim_m = 500
-    else:  # Taper
+    else:
         run_km = 8
         bike_km = 20
         swim_m = 200
@@ -171,7 +158,6 @@ def generate_daily_plan(athlete, today):
         "20:00":"Roti + Veg + Soup"
     }
 
-    # Sunday Special
     sunday_activity = ""
     if weekday==6:
         sunday_activity = random.choice(sunday_activities)
@@ -196,10 +182,7 @@ with tabs[0]:
         st.checkbox(f"{time} - {meal}", key=f"meal_{time}")
 
     st.subheader("Sunday Special Activity")
-    if sunday_activity:
-        st.write(sunday_activity)
-    else:
-        st.write("Regular training day.")
+    st.write(sunday_activity if sunday_activity else "Regular training day.")
 
     st.subheader("Sleep & Recovery")
     sleep_hours = st.slider("Sleep Hours", 0,12,8)
@@ -235,6 +218,7 @@ with tabs[1]:
     if next_sunday_activity:
         st.subheader("Sunday Special")
         st.write(next_sunday_activity)
+
     # Birthday/Festival
     next_day_str = next_day.strftime("%d-%m")
     special_next = ""
@@ -289,4 +273,3 @@ with tabs[5]:
     if team_data:
         team_df = pd.concat(team_data)
         st.dataframe(team_df)
-
