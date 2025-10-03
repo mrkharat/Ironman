@@ -1,4 +1,4 @@
-# ironman_tracker_final.py
+# ironman_tracker_final_v2.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -132,6 +132,8 @@ else:
 def generate_daily_plan(athlete, today):
     weight = ATHLETES[athlete]["weight"]
     weekday = today.weekday()
+
+    # Training load based on phase
     if current_phase=="Base":
         run_km = 5 + 0.1*week_number
         bike_km = 0
@@ -144,27 +146,30 @@ def generate_daily_plan(athlete, today):
         run_km = 15 + 0.2*week_number
         bike_km = 40
         swim_m = 500
-    else:
+    else:  # Taper
         run_km = 8
         bike_km = 20
         swim_m = 200
 
-    # Nutrition (Indian timings)
-    nutrition = {
-        "07:30":"Milk + Oats + Banana",
-        "10:30":"Fruits / Nuts",
-        "13:30":"Rice / Roti + Dal + Veg + Salad",
-        "16:30":"Protein Shake / Fruits",
-        "20:00":"Roti + Veg + Soup"
+    # Nutrition: different per athlete and weekday
+    base_meals = {
+        "07:30":["Milk + Oats + Banana","Milk + Poha + Fruit","Milk + Upma + Nuts"],
+        "10:30":["Fruits / Nuts","Smoothie","Sprouts Salad"],
+        "13:30":["Rice/Roti + Dal + Veg + Salad","Roti + Paneer + Veg","Rice + Chicken/Paneer + Veg"],
+        "16:30":["Protein Shake / Fruits","Fruit Salad","Buttermilk + Nuts"],
+        "20:00":["Roti + Veg + Soup","Roti + Dal + Veg","Rice + Dal + Veg"]
     }
+    athlete_idx = list(ATHLETES.keys()).index(athlete)
+    nutrition = {time: base_meals[time][(athlete_idx + weekday)%3] for time in base_meals}
 
     sunday_activity = ""
     if weekday==6:
         sunday_activity = random.choice(sunday_activities)
 
-    return run_km,bike_km,swim_m,nutrition,sunday_activity
+    return run_km, bike_km, swim_m, nutrition, sunday_activity
 
-run_km,bike_km,swim_m,nutrition,sunday_activity = generate_daily_plan(athlete_name, now)
+# Today's plan
+run_km, bike_km, swim_m, nutrition, sunday_activity = generate_daily_plan(athlete_name, now)
 
 # ---------------------- TAB LAYOUT ----------------------
 tabs = st.tabs(["Today's Plan","Next Day Plan","Weekly Plan","Progress Tracker","Weight & Sleep Tracker","Team Overview"])
@@ -245,7 +250,7 @@ with tabs[2]:
             "Swim_m":swim,
             "Sunday_Activity":sunday_act
         })
-    st.dataframe(pd.DataFrame(weekly_df))  # removed Styler to prevent ValueError
+    st.dataframe(pd.DataFrame(weekly_df))  # error-free
 
 # ---------------------- PROGRESS TRACKER ----------------------
 with tabs[3]:
