@@ -1,4 +1,4 @@
-# ironman_tracker_final.py
+# ironman_tracker_dashboard.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -82,7 +82,6 @@ st.sidebar.write("---")
 st.sidebar.subheader("Quote of the Day")
 st.sidebar.write(random.choice(quotes))
 
-# Today’s Special
 today_str = now.strftime("%d-%m")
 special = ""
 if today_str in festivals:
@@ -122,7 +121,7 @@ for i, pc in enumerate(phase_cumsum):
 else: current_phase = "Taper"
 total_weeks = sum(phase_weeks.values())
 
-# ---------------- MEAL PLANS (Maharashtrian style) ----------------
+# ---------------- MEAL PLANS ----------------
 meal_plans = {
     "Mayur": [
         {"07:30":"Poha + Milk","10:30":"Fruits/Nuts","13:30":"Chapati + Dal + Veg","16:30":"Eggs + Salad","20:00":"Bhakri + Chicken Curry"},
@@ -175,7 +174,6 @@ with tabs[0]:
     submit = st.button("Submit Today's Data")
 
     if submit:
-        # Calculate macros
         macros = {"Protein_g":0,"Carbs_g":0,"Fat_g":0,"Calories":0}
         for t,m in meals.items():
             if any(x in m for x in ["Egg","Chicken","Fish","Mutton","Paneer"]):
@@ -222,20 +220,26 @@ with tabs[2]:
         week_data.append({"Date":d.strftime("%a"),"Run":run,"Bike":bike,"Swim":swim,"Sunday":sa})
     st.dataframe(pd.DataFrame(week_data))
 
-# ---------------- PROGRESS TRACKER (Merged) ----------------
+# ---------------- PROGRESS TRACKER ----------------
 with tabs[3]:
     st.subheader("Progress Tracker")
     target_protein = st.number_input("Target Protein (g/day)",40,200,100,key="prot")
+    target_carbs = st.number_input("Target Carbs (g/day)",100,400,200,key="carb")
+    target_calories = st.number_input("Target Calories (kcal/day)",1500,4000,2500,key="cal")
+
     if not df_log.empty:
         last = df_log.iloc[-1]
-        if last["Protein_g"] < target_protein: st.error("Protein below target today!")
+        st.markdown(f"**Today's Protein:** {last['Protein_g']} g {'🟢' if last['Protein_g']>=target_protein else '🔴'}")
+        st.markdown(f"**Today's Carbs:** {last['Carbs_g']} g {'🟢' if last['Carbs_g']>=target_carbs else '🔴'}")
+        st.markdown(f"**Today's Calories:** {last['Calories']} kcal {'🟢' if last['Calories']>=target_calories else '🔴'}")
+        st.markdown(f"**Sleep:** {last['Sleep']} h")
 
     st.write("### Training Progress")
-    st.metric("Overall Progress", f"{(week_number/total_weeks)*100:.1f}%")
     st.line_chart(df_log.set_index("Date")[["Run_km","Bike_km","Swim_m"]])
 
     st.write("### Nutrition & Sleep")
-    st.line_chart(df_log.set_index("Date")[["Protein_g","Carbs_g","Calories","Sleep"]])
+    df_macro = df_log.set_index("Date")[["Protein_g","Carbs_g","Calories","Sleep"]]
+    st.line_chart(df_macro)
 
 # ---------------- TEAM OVERVIEW ----------------
 with tabs[4]:
@@ -247,7 +251,17 @@ with tabs[4]:
     if all_logs:
         team_df = pd.concat(all_logs)
         st.write("### Protein Intake")
-        st.line_chart(team_df.pivot(index="Date",columns="Athlete",values="Protein_g").fillna(0))
-        st.write("### Running Distance")
+        team_protein = team_df.pivot(index="Date",columns="Athlete",values="Protein_g").fillna(0)
+        st.line_chart(team_protein)
+        st.write("### Carbs Intake")
+        team_carbs = team_df.pivot(index="Date",columns="Athlete",values="Carbs_g").fillna(0)
+        st.line_chart(team_carbs)
+        st.write("### Calories")
+        team_cal = team_df.pivot(index="Date",columns="Athlete",values="Calories").fillna(0)
+        st.line_chart(team_cal)
+        st.write("### Training")
         st.line_chart(team_df.pivot(index="Date",columns="Athlete",values="Run_km").fillna(0))
-        st.success(f"Team is {(week_number/total_weeks)*100:.1f}% on track for Ironman Hamburg 2028")
+        st.line_chart(team_df.pivot(index="Date",columns="Athlete",values="Bike_km").fillna(0))
+        st.line_chart(team_df.pivot(index="Date",columns="Athlete",values="Swim_m").fillna(0))
+        on_track = (week_number/total_weeks)*100
+        st.success(f"Team is {on_track:.1f}% on track for Ironman Hamburg 2028")
