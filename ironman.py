@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 import datetime
 from PIL import Image
+import requests
+from io import BytesIO
 
 # ----------------- Config -----------------
 TODAY = datetime.date.today()
@@ -12,16 +14,18 @@ ATHLETES = ["Mayur", "Sudeep", "Vaishali"]
 IRONMAN_GOA = datetime.date(2026, 6, 1)
 IRONMAN_EUROPE = datetime.date(2028, 7, 15)
 
-# Sidebar logo
+# ----------------- Sidebar -----------------
+st.sidebar.title("🏊 Ironman Tracker")
+
+# Load logo from URL
 LOGO_URL = "https://raw.githubusercontent.com/mrkharat/Ironman/main/Ironman-Logo.jpg"
 try:
-    logo = Image.open(st.experimental_get_url(LOGO_URL))
-except:
-    logo = None
-if logo:
+    response = requests.get(LOGO_URL)
+    logo = Image.open(BytesIO(response.content))
     st.sidebar.image(logo, use_column_width=True)
+except:
+    st.sidebar.write("Logo not available")
 
-st.sidebar.title("🏊 Ironman Tracker")
 st.sidebar.write(f"Days until Ironman 70.3 Goa 2026: {(IRONMAN_GOA - TODAY).days}")
 st.sidebar.write(f"Days until Full Ironman Europe 2028: {(IRONMAN_EUROPE - TODAY).days}")
 
@@ -29,9 +33,7 @@ st.sidebar.write(f"Days until Full Ironman Europe 2028: {(IRONMAN_EUROPE - TODAY
 st.title(f"Hello! Today is {TODAY.strftime('%A, %d %B %Y')}")
 st.subheader("Your weekly guidance:")
 
-# ----------------- Generate 3-year weekly plan -----------------
-# For simplicity, define 3 phases: Beginner (Oct-Dec 2025), Intermediate (2026-2027), Advanced (2028)
-# Weekly plan template
+# ----------------- Generate Weekly Plan -----------------
 def generate_weekly_plan():
     start_date = datetime.date(2025, 10, 1)
     end_date = datetime.date(2028, 7, 15)
@@ -90,6 +92,7 @@ current_week_row = df_weeks[(df_weeks["Week Start"] <= TODAY) & (df_weeks["Week 
 if current_week_row.empty:
     current_week_row = df_weeks.iloc[[0]]
 current_week = current_week_row.iloc[0]
+
 st.markdown(f"**Current Week ({current_week['Week Number']}) - Phase: {current_week['Phase']}**")
 
 # ----------------- Activities -----------------
@@ -134,26 +137,26 @@ for athlete in ATHLETES:
     strength_done = 1 if activity_status[f"{athlete}_Strength"] else 0
     progress_data.append({
         "Athlete": athlete,
-        "Run (%)": run_done*100,
-        "Swim (%)": swim_done*100,
-        "Bike (%)": bike_done*100,
-        "Strength (%)": strength_done*100
+        "Run (%)": f"{run_done*100}%",
+        "Swim (%)": f"{swim_done*100}%",
+        "Bike (%)": f"{bike_done*100}%",
+        "Strength (%)": f"{strength_done*100}%"
     })
 
 df_progress = pd.DataFrame(progress_data)
-st.dataframe(df_progress.style.format("{:.0f}%").highlight_max(axis=0, color='lightgreen'))
+st.dataframe(df_progress, width=700)
 
 # ----------------- Suggestions -----------------
 st.markdown("### 💡 Suggestions / Alerts")
 for athlete in ATHLETES:
     row = df_progress[df_progress["Athlete"]==athlete].iloc[0]
-    if row["Run (%)"] < 100:
+    if row["Run (%)"] != "100%":
         st.warning(f"{athlete}: Complete your running this week to stay on track.")
-    if row["Swim (%)"] < 100:
+    if row["Swim (%)"] != "100%":
         st.warning(f"{athlete}: Focus on swimming sessions.")
-    if row["Bike (%)"] < 100:
+    if row["Bike (%)"] != "100%":
         st.warning(f"{athlete}: Don’t skip cycling workouts.")
-    if row["Strength (%)"] < 100:
+    if row["Strength (%)"] != "100%":
         st.warning(f"{athlete}: Strength & core training is important.")
 
 # ----------------- Logs Tabs -----------------
