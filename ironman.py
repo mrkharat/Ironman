@@ -1,184 +1,261 @@
+# ironman_coach_app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 import os
 import random
+import pytz
 
-# -------------------- CONFIG --------------------
-st.set_page_config(page_title="Ironman Training Coach", layout="wide")
-
-DATA_DIR = "ironman_data"
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+# ------------------ CONFIG ------------------
+DATA_DIR = "athlete_data"
+LOG_DIR = os.path.join(DATA_DIR, "logs")
+WEIGHT_DIR = os.path.join(DATA_DIR, "weight")
 
 ATHLETES = {
-    "Mayur": {"gender": "M", "weight": 62, "target_weight": 62},
-    "Sudeep": {"gender": "M", "weight": 73, "target_weight": 70},
-    "Vaishali": {"gender": "F", "weight": 64, "target_weight": 60}
+    "Mayur": {"weight": 62, "gender": "male", "dob": "1988-12-25"},
+    "Sudeep": {"weight": 73, "gender": "male", "dob": "1988-10-31"},
+    "Vaishali": {"weight": 64, "gender": "female", "dob": "1988-04-02"},
 }
 
-PHASES = [
-    ("Base", 24),   # weeks
-    ("Build", 40),  # weeks
-    ("Peak", 36),   # weeks
-    ("Taper", 12)   # weeks
+IRONMAN_DATE = datetime(2028, 7, 1, 7, 0)  # Hamburg 2028 start
+TIMEZONE = pytz.timezone('Asia/Kolkata')
+
+PHASES = ["Base", "Build", "Peak", "Taper"]
+SUNDAY_ACTIVITIES = [
+    "Hike", "Long Drive", "Plantation Drive", "Family Cycling", "Yoga in Park"
 ]
 
-IRONMAN_DATE = datetime(2028, 7, 14)
-QUOTE_LIST = [
+INDIAN_FESTIVALS = {
+    "2025-10-24": "Diwali",
+    "2026-03-29": "Holi",
+    "2026-08-15": "Independence Day",
+    "2027-01-14": "Makar Sankranti"
+}
+
+QUOTES = [
+    "Every swim stroke counts!",
+    "Run like the wind, ride like a champion.",
+    "Ironman is earned, not given.",
     "Consistency beats intensity.",
-    "Progress, not perfection.",
-    "Train smart, race hard.",
-    "One day at a time.",
-    "Ironman starts in your mind."
+    "Small steps today, Ironman tomorrow."
 ]
 
-# -------------------- UTILS --------------------
-def ist_now():
-    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+# ------------------ FUNCTIONS ------------------
 
-def get_greeting():
-    hour = ist_now().hour
-    if 5 <= hour < 12:
-        return "Good Morning"
-    elif 12 <= hour < 16:
-        return "Good Afternoon"
-    elif 16 <= hour < 20:
-        return "Good Evening"
-    else:
-        return "Good Night"
-
-def get_week_num(today):
-    return ((today - date(2025,10,1)).days // 7) + 1
-
-def get_phase(week_num):
-    total_weeks = 0
-    for name, length in PHASES:
-        if week_num <= total_weeks + length:
-            return name
-        total_weeks += length
-    return "Taper"
+def ensure_dirs():
+    os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(WEIGHT_DIR, exist_ok=True)
 
 def load_log(athlete):
-    path = f"{DATA_DIR}/{athlete}_log.csv"
+    path = os.path.join(LOG_DIR, f"{athlete}.csv")
     if os.path.exists(path):
-        return pd.read_csv(path)
+        df = pd.read_csv(path, parse_dates=["Date"])
     else:
-        return pd.DataFrame(columns=["Date", "Activity", "Completed", "Phase"])
+        df = pd.DataFrame(columns=["Date","Phase","Run","Bike","Swim","Strength","Recovery","Completed"])
+    return df
 
 def save_log(athlete, df):
-    df.to_csv(f"{DATA_DIR}/{athlete}_log.csv", index=False)
+    path = os.path.join(LOG_DIR, f"{athlete}.csv")
+    df.to_csv(path, index=False)
+
+def load_weight(athlete):
+    path = os.path.join(WEIGHT_DIR, f"{athlete}_weight.csv")
+    if os.path.exists(path):
+        df = pd.read_csv(path, parse_dates=["Date"])
+    else:
+        df = pd.DataFrame(columns=["Date","Weight"])
+    return df
+
+def save_weight(athlete, df):
+    path = os.path.join(WEIGHT_DIR, f"{athlete}_weight.csv")
+    df.to_csv(path, index=False)
+
+def get_phase(today):
+    # Define phases over 3 years (approx.)
+    start = datetime(2025,10,1)
+    delta_weeks = (today - start).days // 7
+    cycle = delta_weeks % 52
+    if cycle < 20:
+        return "Base"
+    elif cycle < 36:
+        return "Build"
+    elif cycle < 48:
+        return "Peak"
+    else:
+        return "Taper"
+
+def get_greeting(now):
+    hour = now.hour
+    if hour < 12:
+        return "Good Morning"
+    elif hour < 17:
+        return "Good Afternoon"
+    else:
+        return "Good Evening"
+
+def get_todays_plan(athlete, today):
+    df = load_log(athlete)
+    phase = get_phase(today)
+    
+    # Generate sample plan if not exists for today
+    if not any(df["Date"] == today):
+        run_dist, bike_dist, swim_time = 0,0,0
+        # Running plan
+        if phase=="Base":
+            run_dist = 5
+        elif phase=="Build":
+            run_dist = 10
+        elif phase=="Peak":
+            run_dist = 15
+        elif phase=="Taper":
+            run_dist = 5
+        # Bike starts Feb 2026
+        if today >= datetime(2026,2,1):
+            if phase=="Base":
+                bike_dist = 20
+            elif phase=="Build":
+                bike_dist = 40
+            elif phase=="Peak":
+                bike_dist = 80
+            elif phase=="Taper":
+                bike_dist = 20
+        # Swim starts Nov 2025
+        if today >= datetime(2025,11,1):
+            if phase=="Base":
+                swim_time = 15
+            elif phase=="Build":
+                swim_time = 30
+            elif phase=="Peak":
+                swim_time = 45
+            elif phase=="Taper":
+                swim_time = 15
+        df = df.append({"Date":today,"Phase":phase,"Run":run_dist,"Bike":bike_dist,"Swim":swim_time,
+                        "Strength":30,"Recovery":15,"Completed":False}, ignore_index=True)
+        save_log(athlete, df)
+    today_plan = df[df["Date"]==today].iloc[0]
+    return today_plan
+
+def get_next_day_plan(athlete, today):
+    return get_todays_plan(athlete, today + timedelta(days=1))
+
+def generate_nutrition_plan(athlete, today):
+    # Indian meals and timing
+    return {
+        "07:30": "Breakfast: Oats/Poha/Idli + Milk or Tea",
+        "10:30": "Snack: Banana or Nuts",
+        "13:00": "Lunch: Roti, Dal, Veg, Salad, Yogurt",
+        "16:00": "Snack: Fruit or Protein Shake",
+        "19:00": "Dinner: Roti/Rice, Dal, Veg, Light Soup"
+    }
 
 def get_countdown():
-    delta = IRONMAN_DATE - ist_now()
-    return f"{delta.days}d {delta.seconds//3600}h:{(delta.seconds//60)%60}m left"
+    now = datetime.now(TIMEZONE)
+    diff = IRONMAN_DATE - now
+    days = diff.days
+    hours, rem = divmod(diff.seconds,3600)
+    minutes, seconds = divmod(rem,60)
+    return f"{days}d {hours}h {minutes}m {seconds}s"
 
-def generate_daily_plan(athlete, today):
-    week_num = get_week_num(today)
-    phase = get_phase(week_num)
-    plan = []
+def get_special(today, athlete):
+    today_str = today.strftime("%Y-%m-%d")
+    if today_str in INDIAN_FESTIVALS:
+        return INDIAN_FESTIVALS[today_str]
+    for name, info in ATHLETES.items():
+        dob = datetime.strptime(info["dob"], "%Y-%m-%d")
+        if dob.day == today.day and dob.month == today.month:
+            return f"Happy Birthday {name}!"
+    return ""
 
-    # Running
-    if phase == "Base":
-        plan.append({"Activity":"Run 5 km","Time":"6:30 AM"})
-    elif phase == "Build":
-        plan.append({"Activity":"Run 10 km","Time":"6:30 AM"})
-    elif phase == "Peak":
-        plan.append({"Activity":"Run 15 km","Time":"6:00 AM"})
-    else:
-        plan.append({"Activity":"Light Run 5 km","Time":"6:30 AM"})
+# ------------------ APP ------------------
+st.set_page_config(page_title="Ironman Coaching App", layout="wide")
+st.markdown(
+    """
+    <style>
+    .stApp { background-color: #121212; color: white;}
+    .css-1d391kg {color:white;} 
+    .stDataFrame table {color:white;}
+    </style>
+    """, unsafe_allow_html=True
+)
 
-    # Cycling (from Feb 2026)
-    if today >= date(2026,2,1):
-        if phase in ["Build","Peak"]:
-            km = 15 if phase=="Build" else 30
-            plan.append({"Activity":f"Bike {km} km","Time":"7:30 AM"})
-        elif phase=="Taper":
-            plan.append({"Activity":"Light Bike 10 km","Time":"7:30 AM"})
+ensure_dirs()
+now = datetime.now(TIMEZONE)
+today = datetime(now.year, now.month, now.day)
 
-    # Swimming (from Nov 2025)
-    if today >= date(2025,11,1):
-        if phase in ["Build","Peak"]:
-            plan.append({"Activity":"Swim 1 km","Time":"6:00 PM"})
-        elif phase=="Taper":
-            plan.append({"Activity":"Light Swim 500 m","Time":"6:00 PM"})
+# ------------------ SIDEBAR ------------------
+st.sidebar.image("https://github.com/mrkharat/Ironman/blob/main/Ironman-Logo.jpg?raw=true", use_container_width=True)
+athlete = st.sidebar.selectbox("Select Athlete", list(ATHLETES.keys()))
+st.sidebar.markdown(f"### Countdown to Ironman Hamburg 2028")
+st.sidebar.markdown(get_countdown())
+st.sidebar.markdown(f"### Quote of the Day")
+st.sidebar.markdown(f"_{random.choice(QUOTES)}_")
+st.sidebar.markdown(f"### Today's Special")
+st.sidebar.markdown(get_special(today, athlete))
 
-    # Stretching
-    plan.append({"Activity":"Stretch 15 min","Time":"7:15 AM"})
+# ------------------ MAIN PAGE ------------------
+st.title(f"{get_greeting(now)}, {athlete}!")
+st.markdown(f"**Today:** {today.strftime('%A, %d %B %Y')}")
+st.markdown(f"**Week starting Monday:** {(today - timedelta(days=today.weekday())).strftime('%d %b %Y')}")
+phase = get_phase(today)
+st.markdown(f"**Current Phase:** {phase}")
 
-    # Nutrition
-    nutrition = [
-        {"Meal":"Breakfast","Time":"7:30 AM","Food":"Oats + Banana + Milk"},
-        {"Meal":"Lunch","Time":"1:00 PM","Food":"Rice + Dal + Veg"},
-        {"Meal":"Snack","Time":"4:30 PM","Food":"Fruits / Nuts"},
-        {"Meal":"Dinner","Time":"8:00 PM","Food":"Roti + Paneer/Chicken + Salad"}
-    ]
+# ------------------ TABS ------------------
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Today's Plan","Next Day Plan","Nutrition Log","Progress","Teams Overview"])
 
-    return plan, nutrition, phase
-
-# -------------------- SIDEBAR --------------------
-st.sidebar.image("https://github.com/mrkharat/Ironman/blob/main/Ironman-Logo.jpg", use_column_width=True)
-athlete_name = st.sidebar.selectbox("Select Athlete", list(ATHLETES.keys()))
-st.sidebar.markdown("### Countdown to Ironman Hamburg 2028")
-st.sidebar.markdown(f"**{get_countdown()}**")
-st.sidebar.markdown("### Quote of the Day")
-st.sidebar.info(random.choice(QUOTE_LIST))
-
-# -------------------- MAIN PAGE --------------------
-st.title(f"{get_greeting()}, {athlete_name}!")
-today = ist_now().date()
-st.markdown(f"**Today:** {today.strftime('%A, %d %b %Y')}")
-st.markdown(f"**Week:** {get_week_num(today)} ({get_phase(get_week_num(today))})")
-
-# Load log
-df_log = load_log(athlete_name)
-
-# Tabs
-tab1, tab2, tab3 = st.tabs(["Today's Plan","Next Day Plan","Team Overview"])
-
-# -------------------- TODAY'S PLAN --------------------
+# ------------------ TODAY'S PLAN ------------------
 with tab1:
-    st.subheader("Activities & Nutrition")
-    plan, nutrition, phase = generate_daily_plan(athlete_name, today)
+    plan = get_todays_plan(athlete, today)
+    st.markdown("### Activity Plan")
+    st.checkbox(f"Run: {plan['Run']} km", key=f"{athlete}_run")
+    st.checkbox(f"Bike: {plan['Bike']} km", key=f"{athlete}_bike")
+    st.checkbox(f"Swim: {plan['Swim']} min", key=f"{athlete}_swim")
+    st.checkbox(f"Strength: {plan['Strength']} min", key=f"{athlete}_strength")
+    st.checkbox(f"Recovery: {plan['Recovery']} min", key=f"{athlete}_recovery")
+    st.markdown("### Nutrition Plan")
+    nutrition = generate_nutrition_plan(athlete, today)
+    for time, meal in nutrition.items():
+        st.markdown(f"**{time}** - {meal}")
 
-    for act in plan:
-        completed = st.checkbox(f"{act['Time']} - {act['Activity']}", key=f"{athlete_name}_{act['Activity']}_{today}")
-        if completed:
-            if not ((df_log['Date']==str(today)) & (df_log['Activity']==act['Activity'])).any():
-                df_log = pd.concat([df_log,pd.DataFrame([{
-                    "Date":today,"Activity":act['Activity'],"Completed":True,"Phase":phase
-                }])],ignore_index=True)
-
-    st.markdown("**Nutrition Plan**")
-    for meal in nutrition:
-        st.markdown(f"{meal['Time']} - {meal['Meal']}: {meal['Food']}")
-
-    st.markdown("**Weight Tracker**")
-    weight_input = st.number_input("Enter current weight (kg)", value=ATHLETES[athlete_name]["weight"])
-    st.markdown(f"Target weight: **{ATHLETES[athlete_name]['target_weight']} kg**")
-
-    save_log(athlete_name, df_log)
-
-# -------------------- NEXT DAY PLAN --------------------
+# ------------------ NEXT DAY PLAN ------------------
 with tab2:
-    next_day = today + timedelta(days=1)
-    plan_next, nutrition_next, phase_next = generate_daily_plan(athlete_name, next_day)
-    st.subheader(f"Plan for {next_day.strftime('%A, %d %b %Y')}")
-    for act in plan_next:
-        st.markdown(f"{act['Time']} - {act['Activity']}")
-    st.markdown("**Nutrition**")
-    for meal in nutrition_next:
-        st.markdown(f"{meal['Time']} - {meal['Meal']}: {meal['Food']}")
+    next_plan = get_next_day_plan(athlete, today)
+    st.markdown(f"### Next Day Plan ({(today + timedelta(days=1)).strftime('%A')})")
+    st.markdown(f"Run: {next_plan['Run']} km")
+    st.markdown(f"Bike: {next_plan['Bike']} km")
+    st.markdown(f"Swim: {next_plan['Swim']} min")
+    st.markdown(f"Strength: {next_plan['Strength']} min")
+    st.markdown(f"Recovery: {next_plan['Recovery']} min")
+    st.markdown("### Nutrition Plan")
+    next_nutrition = generate_nutrition_plan(athlete, today+timedelta(days=1))
+    for time, meal in next_nutrition.items():
+        st.markdown(f"**{time}** - {meal}")
 
-# -------------------- TEAM OVERVIEW --------------------
+# ------------------ NUTRITION LOG ------------------
 with tab3:
-    st.subheader("Team Progress")
-    progress_data = []
-    for athlete in ATHLETES:
-        df = load_log(athlete)
-        completed = df[df['Completed']==True].shape[0]
-        total = df.shape[0] if df.shape[0]>0 else 1
-        progress_data.append({"Athlete":athlete,"Progress (%)":round((completed/total)*100,1)})
-    df_progress = pd.DataFrame(progress_data)
-    st.dataframe(df_progress.style.bar(subset=["Progress (%)"], color='#4CAF50'))
+    weight_df = load_weight(athlete)
+    st.markdown("### Weight Tracking")
+    st.dataframe(weight_df, use_container_width=True)
+
+# ------------------ PROGRESS ------------------
+with tab4:
+    df = load_log(athlete)
+    df_progress = df.copy()
+    df_progress["Completion"] = np.where(df_progress["Completed"],1,0)
+    st.markdown("### Weekly Completion Status")
+    if not df_progress.empty:
+        st.bar_chart(df_progress[["Run","Bike","Swim","Strength","Recovery"]].fillna(0))
+    else:
+        st.write("No data yet.")
+
+# ------------------ TEAMS OVERVIEW ------------------
+with tab5:
+    st.markdown("### Teams Overview")
+    all_data = {}
+    for a in ATHLETES:
+        df_a = load_log(a)
+        df_a["Completion"] = np.where(df_a["Completed"],1,0)
+        all_data[a] = df_a[["Date","Completion"]].set_index("Date").resample("W").sum()
+    combined = pd.concat(all_data, axis=1)
+    st.line_chart(combined.fillna(0))
