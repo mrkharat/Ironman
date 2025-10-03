@@ -1,4 +1,4 @@
-# -------------------- Ironman Training Tracker --------------------
+# -------------------- Ironman 3-Year Coaching App --------------------
 import streamlit as st
 import pandas as pd
 import os
@@ -10,7 +10,7 @@ from io import BytesIO
 # -------------------- Constants --------------------
 ATHLETES = ["Mayur", "Sudeep", "Vaishali"]
 TODAY = date.today()
-IRONMAN_EUROPE = date(2028, 7, 15)
+IRONMAN_HAMBURG = date(2028, 7, 15)
 DATA_DIR = "athlete_data"
 
 # -------------------- Create Data Folder --------------------
@@ -32,7 +32,8 @@ for file_path in athlete_files.values():
     init_athlete_log(file_path)
 
 # -------------------- Sidebar --------------------
-st.sidebar.title("🏊 Ironman Tracker")
+st.set_page_config(layout="wide")  # Sidebar always expanded
+st.sidebar.title("🏊 Ironman Coaching")
 
 # Logo
 LOGO_URL = "https://raw.githubusercontent.com/mrkharat/Ironman/main/Ironman-Logo.jpg"
@@ -43,33 +44,45 @@ try:
 except:
     st.sidebar.write("Logo not available")
 
-# Athlete selection
+# Athlete selection dropdown
 st.sidebar.markdown("### 👤 Select Athlete")
-selected_athlete = st.sidebar.radio("Choose Athlete:", ATHLETES)
+selected_athlete = st.sidebar.selectbox("Choose Athlete:", ATHLETES)
 
-# Ironman Hamburg 2028 Countdown
-days_hamburg = (IRONMAN_EUROPE - TODAY).days
+# Hamburg countdown
+days_hamburg = (IRONMAN_HAMBURG - TODAY).days
 st.sidebar.markdown("### 🏁 Ironman Hamburg 2028")
 st.sidebar.metric(label="Days Left", value=days_hamburg)
-st.sidebar.write(f"Date: {IRONMAN_EUROPE.strftime('%d %b %Y')}")
+st.sidebar.write(f"Date: {IRONMAN_HAMBURG.strftime('%d %b %Y')}")
 
 # Quick Tips
 st.sidebar.markdown("### 💡 Quick Tips")
 st.sidebar.write("- Follow weekly training plan")
 st.sidebar.write("- Track nutrition & sleep")
-st.sidebar.write("- Complete all activity checkboxes")
+st.sidebar.write("- Complete all activities daily")
 
 # -------------------- Main Page --------------------
 st.title(f"Hello {selected_athlete}! Today is {TODAY.strftime('%A, %d %B %Y')}")
 st.subheader("Your weekly guidance:")
 
-# Example weekly plan (can be expanded)
-weekly_plan = {
-    "Run": "5 km easy / interval / long run",
-    "Swim": "30-45 min drills",
-    "Bike": "20-40 km endurance",
-    "Strength": "Core + bodyweight"
-}
+# -------------------- Training Plan --------------------
+def generate_weekly_plan(today):
+    """Generate simple weekly guidance based on progressive training"""
+    week_plan = {
+        "Run": "5 km easy / interval / long run",
+        "Swim": "30 min drills",
+        "Bike": "20 km endurance",
+        "Strength": "Core + bodyweight exercises"
+    }
+
+    # Example: gradually increase distances over months
+    month = today.month
+    if month in [10,11,12]:  # Base phase
+        week_plan.update({"Run": "5 km easy", "Swim": "500 m drills", "Bike": "20 km", "Strength":"15 min core"})
+    elif month in [1,2,3,4,5,6,7,8,9]:  # Build phase
+        week_plan.update({"Run": "10 km tempo", "Swim": "1 km", "Bike": "40 km", "Strength":"30 min core & bodyweight"})
+    return week_plan
+
+weekly_plan = generate_weekly_plan(TODAY)
 
 st.markdown("### ✅ Activities")
 activity_status = {}
@@ -80,21 +93,22 @@ for act_type, desc in weekly_plan.items():
 # -------------------- Nutrition --------------------
 st.markdown("### 🥗 Daily Nutrition Guide")
 nutrition_plan = pd.DataFrame({
-    "Meal": ["Breakfast", "Mid-morning Snack", "Lunch", "Evening Snack", "Dinner"],
+    "Meal": ["Breakfast", "Snack1", "Lunch", "Snack2", "Dinner"],
     "Food Suggestion": [
         "Oats porridge with banana + herbal tea",
-        "Fruit (apple/orange) or nuts",
-        "Brown rice, dal, vegetables, grilled chicken/fish",
-        "Greek yogurt or smoothie",
-        "Quinoa, vegetables, paneer or fish"
+        "Fruits or nuts",
+        "Brown rice, dal, vegetables, paneer/chicken/fish",
+        "Smoothie or yogurt",
+        "Quinoa/roti, vegetables, protein"
     ],
     "Time": ["7:30 AM", "10:30 AM", "1:00 PM", "4:30 PM", "8:00 PM"]
 })
 st.dataframe(nutrition_plan, width=700)
 
+# -------------------- Sleep & Recovery --------------------
 st.markdown("### 💤 Sleep & Recovery")
 sleep_hours = st.number_input("Sleep hours", min_value=0.0, max_value=12.0, step=0.5, key=f"{selected_athlete}_sleep")
-st.write("Try to maintain 7-8 hours for optimal recovery.")
+st.write("Aim for 7-8 hours for optimal recovery.")
 
 # -------------------- Load Athlete Data --------------------
 selected_file = athlete_files[selected_athlete]
@@ -109,7 +123,7 @@ if today_str in df_athlete['Date'].values:
         activity_status[f"{selected_athlete}_Swim"],
         activity_status[f"{selected_athlete}_Bike"],
         activity_status[f"{selected_athlete}_Strength"],
-        True, True, True, True, True,  # Assume following nutrition, can add checkboxes if needed
+        True, True, True, True, True,  # assume following nutrition
         sleep_hours
     ]
 else:
@@ -131,6 +145,7 @@ run_done = 1 if activity_status[f"{selected_athlete}_Run"] else 0
 swim_done = 1 if activity_status[f"{selected_athlete}_Swim"] else 0
 bike_done = 1 if activity_status[f"{selected_athlete}_Bike"] else 0
 strength_done = 1 if activity_status[f"{selected_athlete}_Strength"] else 0
+
 df_progress = pd.DataFrame([{
     "Athlete": selected_athlete,
     "Run (%)": f"{run_done*100}%",
