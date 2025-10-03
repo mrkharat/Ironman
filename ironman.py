@@ -1,4 +1,4 @@
-# ironman_tracker_fixed.py
+# ironman_tracker_final.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -245,7 +245,7 @@ with tabs[2]:
             "Swim_m":swim,
             "Sunday_Activity":sunday_act
         })
-    st.dataframe(pd.DataFrame(weekly_df).style.format("{:.1f}"))
+    st.dataframe(pd.DataFrame(weekly_df))  # removed Styler to prevent ValueError
 
 # ---------------------- PROGRESS TRACKER ----------------------
 with tabs[3]:
