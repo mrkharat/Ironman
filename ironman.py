@@ -21,7 +21,8 @@ st.markdown("""
 @media (max-width: 768px) {
     .block-container { padding: 0.8rem 0.5rem; }
     h1, h2, h3 { font-size: 1.2rem !important; }
-    .stButton>button { width: 100%; }
+    .stButton>button { width: 100%; margin-bottom:5px; }
+    .stSlider>div>div>input { width:100% !important; }
 }
 body { background-color: #0E1117; color: #FFFFFF; }
 .stButton>button { background-color: #1F2A40; color: #FFFFFF; border-radius: 6px; }
@@ -83,7 +84,6 @@ st.sidebar.write("---")
 st.sidebar.subheader("Quote of the Day")
 st.sidebar.write(random.choice(quotes))
 
-# Today’s Special
 today_str = now.strftime("%d-%m")
 special = ""
 if today_str in festivals:
@@ -100,7 +100,6 @@ hour = now.hour
 if hour < 12: greeting = "Good Morning"
 elif hour < 16: greeting = "Good Afternoon"
 else: greeting = "Good Evening"
-
 st.title(f"{greeting}, {athlete}!")
 st.write(f"📅 {now.strftime('%A, %d %B %Y')} | Week starting { (now - timedelta(days=now.weekday())).strftime('%d %b %Y')}")
 
@@ -123,7 +122,7 @@ for i, pc in enumerate(phase_cumsum):
 else: current_phase = "Taper"
 total_weeks = sum(phase_weeks.values())
 
-# ---------------- MEAL PLANS (Maharashtrian style) ----------------
+# ---------------- MEAL PLANS ----------------
 meal_plans = {
     "Mayur": [
         {"07:30":"Poha + Milk","10:30":"Fruits/Nuts","13:30":"Chapati + Dal + Veg","16:30":"Eggs + Salad","20:00":"Bhakri + Chicken Curry"},
@@ -173,32 +172,31 @@ with tabs[0]:
     sleep = st.slider("Sleep Hours",0,12,8)
     recovery = st.slider("Recovery Level",0,100,60)
 
-    # Compute macros only if checkbox checked
-    run_actual = run if chk_run else 0
-    bike_actual = bike if chk_bike else 0
-    swim_actual = swim if chk_swim else 0
+    # ---------------- SUBMIT BUTTON ----------------
+    if st.button("Update Today's Data"):
+        run_actual = run if chk_run else 0
+        bike_actual = bike if chk_bike else 0
+        swim_actual = swim if chk_swim else 0
 
-    protein, carbs, calories = 0,0,0
-    for t,m in meals.items():
-        if st.session_state.get(f"meal_{t}", False):
-            if any(x in m for x in ["Egg","Chicken","Fish","Mutton","Paneer"]):
-                protein += 25; calories += 300
-            else:
-                carbs += 30; calories += 200
-    fat = 0.25*calories/9
+        protein, carbs, calories = 0,0,0
+        for t,m in meals.items():
+            if st.session_state.get(f"meal_{t}", False):
+                if any(x in m for x in ["Egg","Chicken","Fish","Mutton","Paneer"]):
+                    protein += 25; calories += 300
+                else:
+                    carbs += 30; calories += 200
+        fat = 0.25*calories/9
 
-    # Save immediately
-    df_log = df_log[df_log["Date"]!=now.strftime("%Y-%m-%d")]
-    df_log = pd.concat([df_log, pd.DataFrame([{
-        "Date":now.strftime("%Y-%m-%d"),
-        "Phase":current_phase,
-        "Run_km":run_actual,"Bike_km":bike_actual,"Swim_m":swim_actual,
-        "Protein_g":protein,"Carbs_g":carbs,"Fat_g":fat,"Calories":calories,
-        "Sleep":sleep,"Recovery":recovery
-    }])])
-    df_log.to_csv(data_file,index=False)
-
-    if sun_act: st.info(f"Sunday Activity: {sun_act}")
+        df_log = df_log[df_log["Date"]!=now.strftime("%Y-%m-%d")]
+        df_log = pd.concat([df_log, pd.DataFrame([{
+            "Date":now.strftime("%Y-%m-%d"),
+            "Phase":current_phase,
+            "Run_km":run_actual,"Bike_km":bike_actual,"Swim_m":swim_actual,
+            "Protein_g":protein,"Carbs_g":carbs,"Fat_g":fat,"Calories":calories,
+            "Sleep":sleep,"Recovery":recovery
+        }])])
+        df_log.to_csv(data_file,index=False)
+        st.success("Today's data updated!")
 
 # ---------------- NEXT DAY ----------------
 with tabs[1]:
@@ -226,21 +224,18 @@ with tabs[2]:
 # ---------------- PROGRESS TRACKER (Merged) ----------------
 with tabs[3]:
     st.subheader("Progress Tracker")
-    # Read latest
     df_log = pd.read_csv(data_file, parse_dates=["Date"])
     target_protein = st.number_input("Target Protein (g/day)",40,200,100,key="prot")
-    last_day = df_log.iloc[-1]
-    if last_day["Protein_g"] < target_protein: st.error("Protein below target today!")
 
-    # Overall Progress
+    if not df_log.empty and df_log.iloc[-1]["Protein_g"] < target_protein:
+        st.error("Protein below target today!")
+
     progress = (week_number/total_weeks)*100
     st.metric("Overall Training Progress", f"{progress:.1f}%")
 
-    # Activity charts
     st.markdown("**Activity (Run/Bike/Swim)**")
     st.line_chart(df_log.set_index("Date")[["Run_km","Bike_km","Swim_m"]])
 
-    # Nutrition charts
     st.markdown("**Nutrition & Sleep**")
     st.line_chart(df_log.set_index("Date")[["Protein_g","Carbs_g","Calories","Sleep"]])
 
