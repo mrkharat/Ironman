@@ -21,8 +21,7 @@ st.markdown("""
 @media (max-width: 768px) {
     .block-container { padding: 0.8rem 0.5rem; }
     h1, h2, h3 { font-size: 1.2rem !important; }
-    .stButton>button { width: 100%; margin-bottom:5px; }
-    .stSlider>div>div>input { width:100% !important; }
+    .stButton>button { width: 100%; }
 }
 body { background-color: #0E1117; color: #FFFFFF; }
 .stButton>button { background-color: #1F2A40; color: #FFFFFF; border-radius: 6px; }
@@ -79,11 +78,11 @@ athlete = st.sidebar.selectbox("Select Athlete", list(ATHLETES.keys()))
 st.sidebar.write("---")
 st.sidebar.subheader("Ironman Hamburg 2028 Countdown")
 st.sidebar.write(f"{days_left} Days Left")
-
 st.sidebar.write("---")
 st.sidebar.subheader("Quote of the Day")
 st.sidebar.write(random.choice(quotes))
 
+# Today’s Special
 today_str = now.strftime("%d-%m")
 special = ""
 if today_str in festivals:
@@ -122,7 +121,7 @@ for i, pc in enumerate(phase_cumsum):
 else: current_phase = "Taper"
 total_weeks = sum(phase_weeks.values())
 
-# ---------------- MEAL PLANS ----------------
+# ---------------- MEAL PLANS (Maharashtrian style) ----------------
 meal_plans = {
     "Mayur": [
         {"07:30":"Poha + Milk","10:30":"Fruits/Nuts","13:30":"Chapati + Dal + Veg","16:30":"Eggs + Salad","20:00":"Bhakri + Chicken Curry"},
@@ -140,6 +139,7 @@ meal_plans = {
 
 # ---------------- GENERATE PLAN ----------------
 def generate_daily_plan(athlete, today):
+    # Training load
     if current_phase=="Base":
         run, bike, swim = 5+0.1*week_number, 0, 0
     elif current_phase=="Build":
@@ -148,7 +148,9 @@ def generate_daily_plan(athlete, today):
         run, bike, swim = 15+0.2*week_number, 40, 500
     else:
         run, bike, swim = 8, 20, 200
+    # Meals (alternate daily rotation)
     meals = meal_plans[athlete][today.day % len(meal_plans[athlete])]
+    # Sunday special
     sunday_activity = random.choice(sunday_activities) if today.weekday()==6 else ""
     return run, bike, swim, meals, sunday_activity
 
@@ -158,45 +160,45 @@ tabs = st.tabs(["Today's Plan","Next Day Plan","Weekly Plan","Progress Tracker",
 # ---------------- TODAY ----------------
 with tabs[0]:
     run,bike,swim,meals,sun_act = generate_daily_plan(athlete, now)
-
     st.subheader("Training")
-    chk_run = st.checkbox(f"Run {run:.1f} km", key="chk_run")
-    chk_bike = st.checkbox(f"Bike {bike:.1f} km", key="chk_bike")
-    chk_swim = st.checkbox(f"Swim {swim:.0f} m", key="chk_swim")
+    run_chk = st.checkbox(f"Run {run:.1f} km", key="run")
+    bike_chk = st.checkbox(f"Bike {bike:.1f} km", key="bike")
+    swim_chk = st.checkbox(f"Swim {swim:.0f} m", key="swim")
 
     st.subheader("Nutrition")
-    for t,m in meals.items(): 
-        st.checkbox(f"{t} - {m}", key=f"meal_{t}")
+    meal_chk = {}
+    for t,m in meals.items(): meal_chk[t] = st.checkbox(f"{t} - {m}", key=f"meal_{t}")
 
     st.subheader("Sleep & Recovery")
     sleep = st.slider("Sleep Hours",0,12,8)
     recovery = st.slider("Recovery Level",0,100,60)
 
-    # ---------------- SUBMIT BUTTON ----------------
+    # Button to submit today's data
     if st.button("Update Today's Data"):
-        run_actual = run if chk_run else 0
-        bike_actual = bike if chk_bike else 0
-        swim_actual = swim if chk_swim else 0
-
-        protein, carbs, calories = 0,0,0
+        # Estimate macros
+        macros = {"Protein_g":0,"Carbs_g":0,"Fat_g":0,"Calories":0}
         for t,m in meals.items():
-            if st.session_state.get(f"meal_{t}", False):
+            if meal_chk[t]:  # only if selected
                 if any(x in m for x in ["Egg","Chicken","Fish","Mutton","Paneer"]):
-                    protein += 25; calories += 300
+                    macros["Protein_g"] += 25; macros["Calories"] += 300
                 else:
-                    carbs += 30; calories += 200
-        fat = 0.25*calories/9
+                    macros["Carbs_g"] += 30; macros["Calories"] += 200
+        macros["Fat_g"] = 0.25*macros["Calories"]/9
 
+        # Save data
         df_log = df_log[df_log["Date"]!=now.strftime("%Y-%m-%d")]
         df_log = pd.concat([df_log, pd.DataFrame([{
-            "Date":now.strftime("%Y-%m-%d"),
-            "Phase":current_phase,
-            "Run_km":run_actual,"Bike_km":bike_actual,"Swim_m":swim_actual,
-            "Protein_g":protein,"Carbs_g":carbs,"Fat_g":fat,"Calories":calories,
+            "Date":now.strftime("%Y-%m-%d"),"Phase":current_phase,
+            "Run_km":run if run_chk else 0,"Bike_km":bike if bike_chk else 0,"Swim_m":swim if swim_chk else 0,
+            "Protein_g":macros["Protein_g"],"Carbs_g":macros["Carbs_g"],
+            "Fat_g":macros["Fat_g"],"Calories":macros["Calories"],
             "Sleep":sleep,"Recovery":recovery
         }])])
         df_log.to_csv(data_file,index=False)
+        df_log = pd.read_csv(data_file, parse_dates=["Date"])  # reload for charts
         st.success("Today's data updated!")
+
+    if sun_act: st.info(f"Sunday Activity: {sun_act}")
 
 # ---------------- NEXT DAY ----------------
 with tabs[1]:
@@ -221,23 +223,23 @@ with tabs[2]:
         week_data.append({"Date":d.strftime("%a"),"Run":run,"Bike":bike,"Swim":swim,"Sunday":sa})
     st.dataframe(pd.DataFrame(week_data))
 
-# ---------------- PROGRESS TRACKER (Merged) ----------------
+# ---------------- PROGRESS TRACKER ----------------
 with tabs[3]:
     st.subheader("Progress Tracker")
-    df_log = pd.read_csv(data_file, parse_dates=["Date"])
-    target_protein = st.number_input("Target Protein (g/day)",40,200,100,key="prot")
-
-    if not df_log.empty and df_log.iloc[-1]["Protein_g"] < target_protein:
-        st.error("Protein below target today!")
-
     progress = (week_number/total_weeks)*100
-    st.metric("Overall Training Progress", f"{progress:.1f}%")
-
-    st.markdown("**Activity (Run/Bike/Swim)**")
-    st.line_chart(df_log.set_index("Date")[["Run_km","Bike_km","Swim_m"]])
-
-    st.markdown("**Nutrition & Sleep**")
-    st.line_chart(df_log.set_index("Date")[["Protein_g","Carbs_g","Calories","Sleep"]])
+    st.metric("Overall Progress", f"{progress:.1f}%")
+    
+    if not df_log.empty:
+        st.markdown("**Activity Tracking**")
+        activity_chart = df_log.set_index("Date")[["Run_km","Bike_km","Swim_m"]]
+        st.line_chart(activity_chart)
+        
+        st.markdown("**Nutrition & Sleep Tracking**")
+        target_protein = st.number_input("Target Protein (g/day)",40,200,100,key="prot")
+        st.line_chart(df_log.set_index("Date")[["Protein_g","Carbs_g","Calories","Sleep"]])
+        last = df_log.iloc[-1]
+        if last["Protein_g"] < target_protein:
+            st.error("Protein below target today!")
 
 # ---------------- TEAM OVERVIEW ----------------
 with tabs[4]:
