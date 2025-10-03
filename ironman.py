@@ -17,7 +17,6 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # ---------------- DARK THEME & MOBILE UI ----------------
 st.markdown("""
 <style>
-/* Mobile-friendly adjustments */
 @media (max-width: 768px) {
     .block-container { padding: 0.8rem 0.5rem; }
     h1, h2, h3 { font-size: 1.2rem !important; }
@@ -78,7 +77,6 @@ athlete = st.sidebar.selectbox("Select Athlete", list(ATHLETES.keys()))
 st.sidebar.write("---")
 st.sidebar.subheader("Ironman Hamburg 2028 Countdown")
 st.sidebar.write(f"{days_left} Days Left")
-
 st.sidebar.write("---")
 st.sidebar.subheader("Quote of the Day")
 st.sidebar.write(random.choice(quotes))
@@ -100,7 +98,6 @@ hour = now.hour
 if hour < 12: greeting = "Good Morning"
 elif hour < 16: greeting = "Good Afternoon"
 else: greeting = "Good Evening"
-
 st.title(f"{greeting}, {athlete}!")
 st.write(f"📅 {now.strftime('%A, %d %B %Y')} | Week starting { (now - timedelta(days=now.weekday())).strftime('%d %b %Y')}")
 
@@ -150,9 +147,7 @@ def generate_daily_plan(athlete, today):
         run, bike, swim = 15+0.2*week_number, 40, 500
     else:
         run, bike, swim = 8, 20, 200
-    # Meals (alternate daily rotation)
     meals = meal_plans[athlete][today.day % len(meal_plans[athlete])]
-    # Sunday special
     sunday_activity = random.choice(sunday_activities) if today.weekday()==6 else ""
     return run, bike, swim, meals, sunday_activity
 
@@ -163,37 +158,40 @@ tabs = st.tabs(["Today's Plan","Next Day Plan","Weekly Plan","Progress Tracker",
 with tabs[0]:
     run,bike,swim,meals,sun_act = generate_daily_plan(athlete, now)
     st.subheader("Training")
-    st.checkbox(f"Run {run:.1f} km")
-    st.checkbox(f"Bike {bike:.1f} km")
-    st.checkbox(f"Swim {swim:.0f} m")
+    chk_run = st.checkbox(f"Run {run:.1f} km", key="chk_run")
+    chk_bike = st.checkbox(f"Bike {bike:.1f} km", key="chk_bike")
+    chk_swim = st.checkbox(f"Swim {swim:.0f} m", key="chk_swim")
 
     st.subheader("Nutrition")
-    for t,m in meals.items(): st.checkbox(f"{t} - {m}")
+    meal_checks = {}
+    for t,m in meals.items(): meal_checks[t] = st.checkbox(f"{t} - {m}", key=f"meal_{t}")
 
     st.subheader("Sleep & Recovery")
     sleep = st.slider("Sleep Hours",0,12,8)
     recovery = st.slider("Recovery Level",0,100,60)
 
-    # Nutrition macros estimation
-    macros = {"Protein_g":0,"Carbs_g":0,"Fat_g":0,"Calories":0}
-    for meal in meals.values():
-        if "Egg" in meal or "Chicken" in meal or "Fish" in meal or "Mutton" in meal or "Paneer" in meal:
-            macros["Protein_g"] += 25; macros["Calories"] += 300
-        else:
-            macros["Carbs_g"] += 30; macros["Calories"] += 200
-    macros["Fat_g"] = 0.25*macros["Calories"]/9
+    # Compute actual based on checkboxes
+    run_actual = run if chk_run else 0
+    bike_actual = bike if chk_bike else 0
+    swim_actual = swim if chk_swim else 0
+    protein, carbs, calories = 0,0,0
+    for t,m in meals.items():
+        if meal_checks[t]:
+            if any(x in m for x in ["Egg","Chicken","Fish","Mutton","Paneer"]):
+                protein += 25; calories += 300
+            else:
+                carbs += 30; calories += 200
+    fat = 0.25*calories/9
 
-    # Save
+    # Save to log
     df_log = df_log[df_log["Date"]!=now.strftime("%Y-%m-%d")]
     df_log = pd.concat([df_log, pd.DataFrame([{
         "Date":now.strftime("%Y-%m-%d"),"Phase":current_phase,
-        "Run_km":run,"Bike_km":bike,"Swim_m":swim,
-        "Protein_g":macros["Protein_g"],"Carbs_g":macros["Carbs_g"],
-        "Fat_g":macros["Fat_g"],"Calories":macros["Calories"],
+        "Run_km":run_actual,"Bike_km":bike_actual,"Swim_m":swim_actual,
+        "Protein_g":protein,"Carbs_g":carbs,"Fat_g":fat,"Calories":calories,
         "Sleep":sleep,"Recovery":recovery
     }])])
     df_log.to_csv(data_file,index=False)
-
     if sun_act: st.info(f"Sunday Activity: {sun_act}")
 
 # ---------------- NEXT DAY ----------------
@@ -219,25 +217,22 @@ with tabs[2]:
         week_data.append({"Date":d.strftime("%a"),"Run":run,"Bike":bike,"Swim":swim,"Sunday":sa})
     st.dataframe(pd.DataFrame(week_data))
 
-# ---------------- PROGRESS (Merged) ----------------
+# ---------------- PROGRESS TRACKER (ACTIVITY + NUTRITION) ----------------
 with tabs[3]:
     st.subheader("Progress Tracker")
-
     progress = (week_number/total_weeks)*100
-    st.metric("Overall Progress", f"{progress:.1f}%")
+    st.metric("Overall Training Progress", f"{progress:.1f}%")
 
-    st.write("### Training Progress")
+    # Activity charts
+    st.markdown("**Activity Progress**")
     st.line_chart(df_log.set_index("Date")[["Run_km","Bike_km","Swim_m"]])
 
-    st.write("### Nutrition & Sleep")
+    # Nutrition charts
+    st.markdown("**Nutrition & Sleep**")
     target_protein = st.number_input("Target Protein (g/day)",40,200,100,key="prot")
     if not df_log.empty:
         last = df_log.iloc[-1]
-        if last["Protein_g"] < target_protein:
-            st.error("⚠️ Protein below target today!")
-        if last["Sleep"] < 7:
-            st.warning("😴 Less than 7 hrs sleep yesterday!")
-
+        if last["Protein_g"] < target_protein: st.error("Protein below target today!")
     st.line_chart(df_log.set_index("Date")[["Protein_g","Carbs_g","Calories","Sleep"]])
 
 # ---------------- TEAM OVERVIEW ----------------
@@ -249,9 +244,9 @@ with tabs[4]:
         if os.path.exists(f): all_logs.append(pd.read_csv(f,parse_dates=["Date"]).assign(Athlete=ath))
     if all_logs:
         team_df = pd.concat(all_logs)
-        st.write("### Nutrition Comparison (Protein)")
+        st.markdown("**Team Protein Progress**")
         st.line_chart(team_df.pivot(index="Date",columns="Athlete",values="Protein_g").fillna(0))
-        st.write("### Training Comparison (Run)")
+        st.markdown("**Team Activity Progress (Run km)**")
         st.line_chart(team_df.pivot(index="Date",columns="Athlete",values="Run_km").fillna(0))
         on_track = (week_number/total_weeks)*100
-        st.success(f"✅ Team is {on_track:.1f}% on track for Ironman Hamburg 2028")
+        st.success(f"Team is {on_track:.1f}% on track for Ironman Hamburg 2028")
