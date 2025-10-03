@@ -1,4 +1,4 @@
-# ironman_tracker_final_v2.py
+# ironman_tracker_maha.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -47,7 +47,7 @@ sunday_activities = [
     "Go for a hike",
     "Long drive together",
     "Plantation drive",
-    "Group cycling (if available)",
+    "Group cycling",
     "Beach run",
     "Yoga session together",
     "Meditation retreat"
@@ -58,7 +58,8 @@ festivals = {
     "01-01":"New Year",
     "15-08":"Independence Day",
     "02-10":"Gandhi Jayanti",
-    "25-12":"Christmas"
+    "25-12":"Christmas",
+    "13-11":"Diwali"
 }
 
 # ---------------------- LOGO ----------------------
@@ -151,13 +152,33 @@ def generate_daily_plan(athlete, today):
         bike_km = 20
         swim_m = 200
 
-    # Nutrition: different per athlete and weekday
+    # Nutrition: Maharashtrian meals + eggs/chicken/mutton for non-veg athletes
     base_meals = {
-        "07:30":["Milk + Oats + Banana","Milk + Poha + Fruit","Milk + Upma + Nuts"],
-        "10:30":["Fruits / Nuts","Smoothie","Sprouts Salad"],
-        "13:30":["Rice/Roti + Dal + Veg + Salad","Roti + Paneer + Veg","Rice + Chicken/Paneer + Veg"],
-        "16:30":["Protein Shake / Fruits","Fruit Salad","Buttermilk + Nuts"],
-        "20:00":["Roti + Veg + Soup","Roti + Dal + Veg","Rice + Dal + Veg"]
+        "07:30":[
+            "Poha + Milk + Banana",
+            "Upma + Milk + Nuts",
+            "Bhakri + Egg"
+        ],
+        "10:30":[
+            "Fruits / Nuts",
+            "Sprouts Salad",
+            "Protein Shake"
+        ],
+        "13:30":[
+            "Roti + Dal + Veg + Salad",
+            "Bhakri + Chicken Curry + Veg",
+            "Rice + Mutton + Veg"
+        ],
+        "16:30":[
+            "Buttermilk + Nuts",
+            "Fruits / Protein Shake",
+            "Boiled Eggs + Fruit"
+        ],
+        "20:00":[
+            "Roti + Dal + Veg",
+            "Bhakri + Paneer Curry + Salad",
+            "Rice + Chicken / Veg Curry"
+        ]
     }
     athlete_idx = list(ATHLETES.keys()).index(athlete)
     nutrition = {time: base_meals[time][(athlete_idx + weekday)%3] for time in base_meals}
@@ -238,7 +259,6 @@ with tabs[1]:
 # ---------------------- WEEKLY PLAN ----------------------
 with tabs[2]:
     st.subheader("Weekly Overview")
-    week_start = now - timedelta(days=now.weekday())
     week_dates = [week_start + timedelta(days=i) for i in range(7)]
     weekly_df = []
     for d in week_dates:
@@ -250,7 +270,7 @@ with tabs[2]:
             "Swim_m":swim,
             "Sunday_Activity":sunday_act
         })
-    st.dataframe(pd.DataFrame(weekly_df))  # error-free
+    st.dataframe(pd.DataFrame(weekly_df))
 
 # ---------------------- PROGRESS TRACKER ----------------------
 with tabs[3]:
