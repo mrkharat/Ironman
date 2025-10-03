@@ -1,140 +1,81 @@
-# ironman_professional.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from PIL import Image
+import pytz
 
-# -------------------- Constants --------------------
-st.set_page_config(page_title="Ironman Pro Coach", layout="wide", initial_sidebar_state="expanded")
-st.markdown(
-    "<style>body{background-color:#121212;color:white;} .stButton>button{background-color:#1E90FF;color:white;}</style>", 
-    unsafe_allow_html=True
-)
+# ----------------- SETTINGS -----------------
+st.set_page_config(page_title="Ironman Coach App", layout="wide", initial_sidebar_state="expanded")
 
+# ---------- CONSTANTS ----------
 ATHLETES = {
-    "Mayur": {"sex": "M", "weight": 62},
-    "Sudeep": {"sex": "M", "weight": 73},
-    "Vaishali": {"sex": "F", "weight": 64}
+    "Mayur": {"gender":"M", "weight":62},
+    "Sudeep": {"gender":"M", "weight":73},
+    "Vaishali": {"gender":"F", "weight":64}
 }
 
-IRONMAN_HAMBURG_DATE = datetime(2028, 7, 15, 7, 0)
+IRONMAN_DATE = datetime(2028, 7, 1, 6, 0, 0)  # Ironman Hamburg 2028 assumed
+TIMEZONE = pytz.timezone('Asia/Kolkata')
 
-# -------------------- Helper Functions --------------------
-def get_ist_time():
-    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+# ----------------- SIDEBAR -----------------
+st.sidebar.image("https://github.com/mrkharat/Ironman/blob/main/Ironman-Logo.jpg", use_column_width=True)
+st.sidebar.header("Select Athlete")
+athlete = st.sidebar.selectbox("Athlete", list(ATHLETES.keys()))
+st.sidebar.markdown("---")
 
-def get_greeting():
-    hour = get_ist_time().hour
-    if 5 <= hour < 12:
-        return "Good Morning"
-    elif 12 <= hour < 17:
-        return "Good Afternoon"
-    elif 17 <= hour < 21:
-        return "Good Evening"
-    else:
-        return "Good Night"
+# Countdown to Ironman Hamburg 2028
+now = datetime.now(TIMEZONE)
+delta = IRONMAN_DATE - now
+st.sidebar.subheader("Ironman Hamburg 2028 Countdown")
+st.sidebar.write(f"{delta.days} days, {delta.seconds//3600} hrs")
 
-def generate_weekly_plan(athlete):
-    today = get_ist_time()
-    week_start = today - timedelta(days=today.weekday())
-    plan = []
-    for i in range(7):
-        day = week_start + timedelta(days=i)
-        day_plan = {"Date": day, "Activity": [], "Nutrition": [], "Sleep": "7-8 hrs", "Tips": []}
-        
-        # Activities based on timeline
-        if day < datetime(2025,11,1):
-            day_plan["Activity"].append("Run 5-10 km")
-            day_plan["Tips"].append("Focus on running form and breathing")
-        else:
-            day_plan["Activity"].append("Swim 500-1000 m")
-            day_plan["Tips"].append("Focus on stroke efficiency")
-            if day >= datetime(2026,2,1):
-                day_plan["Activity"].append("Cycle 20-40 km")
-                day_plan["Tips"].append("Maintain cadence and practice nutrition on bike")
-        
-        # Nutrition
-        day_plan["Nutrition"] = [
-            "07:30 - Breakfast",
-            "10:30 - Mid-morning Snack",
-            "13:00 - Lunch",
-            "16:30 - Evening Snack",
-            "20:00 - Dinner"
-        ]
-        day_plan["Tips"].append("Stay hydrated and follow meal timings")
-        
-        plan.append(day_plan)
-    return plan
+# ----------------- MAIN PAGE -----------------
+# Greeting
+hour = now.hour
+if hour<12:
+    greet="Good Morning"
+elif hour<17:
+    greet="Good Afternoon"
+else:
+    greet="Good Evening"
 
-def get_today_tip(plan_today, completed_activities=[]):
-    tips = []
-    for idx, act in enumerate(plan_today["Activity"]):
-        if act not in completed_activities:
-            tips.append(f"Reminder: {act} – {plan_today['Tips'][idx]}")
-    return tips if tips else ["Excellent! You completed today's activities."]
+st.title(f"{greet}, {athlete}!")
+st.subheader(now.strftime("%A, %d %B %Y"))
 
-# -------------------- Sidebar --------------------
-st.sidebar.image("https://github.com/mrkharat/Ironman/blob/main/Ironman-Logo.jpg?raw=true", use_container_width=True)
-st.sidebar.title("Ironman Pro Coach")
-selected_athlete = st.sidebar.selectbox("Select Athlete", list(ATHLETES.keys()))
-today = get_ist_time()
-st.sidebar.write(f"{get_greeting()}, {selected_athlete}!")
-st.sidebar.write(f"Today: {today.strftime('%A, %d %B %Y')}")
-week_start = today - timedelta(days=today.weekday())
-st.sidebar.write(f"Week Start: {week_start.strftime('%d %b %Y')}")
-days_left = (IRONMAN_HAMBURG_DATE - today).days
-st.sidebar.write(f"Ironman Hamburg 2028 in **{days_left} days**")
-st.sidebar.write(f"Target Weight: **{ATHLETES[selected_athlete]['weight']} kg**")
+# Current week (starting Monday)
+week_start = now - timedelta(days=now.weekday())
+st.write(f"Current Week: {week_start.strftime('%d %b %Y')} - {(week_start + timedelta(days=6)).strftime('%d %b %Y')}")
 
-# -------------------- Main Page --------------------
-st.title(f"{get_greeting()}, {selected_athlete}!")
-st.subheader(f"Today: {today.strftime('%A, %d %B %Y')} | Week Start: {week_start.strftime('%d %b %Y')}")
+# ---------- SAMPLE PLAN (FOR DEMO) ----------
+# Weekly Activity
+activity_plan = {
+    "Monday":["Run 5 km 6:00-7:00", "Breakfast 7:30", "Office work", "Lunch 13:00", "Stretching 18:00", "Dinner 20:00"],
+    "Tuesday":["Run 6 km 6:00-7:00", "Breakfast 7:30", "Office work", "Lunch 13:00", "Core exercises 18:00", "Dinner 20:00"],
+    "Wednesday":["Rest / Walk", "Breakfast 7:30", "Office work", "Lunch 13:00", "Swimming 19:00 (Nov+)", "Dinner 20:00"],
+    "Thursday":["Run 8 km 6:00-7:00", "Breakfast 7:30", "Office work", "Lunch 13:00", "Strength 18:00", "Dinner 20:00"],
+    "Friday":["Cycle 20 km 6:00-7:30 (Feb 2026+)", "Breakfast 7:30", "Office work", "Lunch 13:00", "Dinner 20:00"],
+    "Saturday":["Long Run 10-15 km", "Breakfast 7:30", "Lunch 13:00", "Optional Swim 18:00 (Nov+)", "Dinner 20:00"],
+    "Sunday":["Rest / Yoga", "Breakfast 7:30", "Lunch 13:00", "Dinner 20:00"]
+}
 
-weekly_plan = generate_weekly_plan(selected_athlete)
+# Tabs for main page
+tab1, tab2, tab3, tab4 = st.tabs(["Today's Plan", "Next Day Plan", "Teams Overview", "Tips & Motivation"])
 
-# -------------------- Tabs --------------------
-tab1, tab2, tab3 = st.tabs(["Today's Plan", "Next Day Preview", "Teams Overview"])
-
-# ----------- Today's Plan Tab -----------
+# --------------- TAB 1: TODAY -----------------
 with tab1:
-    st.header("Today's Plan")
-    today_plan = weekly_plan[0]
-    completed_activities = []
-    
-    st.subheader("Activities")
-    for idx, act in enumerate(today_plan["Activity"]):
-        if st.checkbox(act, key=f"activity_{selected_athlete}_{idx}"):
-            completed_activities.append(act)
-            
-    st.subheader("Nutrition")
-    for idx, meal in enumerate(today_plan["Nutrition"]):
-        st.checkbox(meal, key=f"meal_{selected_athlete}_{idx}")
-        
-    st.subheader("Sleep")
-    st.checkbox(today_plan["Sleep"], key=f"sleep_{selected_athlete}")
-    
-    st.subheader("Coach's Tips & Motivation")
-    for tip in get_today_tip(today_plan, completed_activities):
-        st.info(tip)
+    today_name = now.strftime("%A")
+    st.header(f"Today's Plan: {today_name}")
+    for task in activity_plan[today_name]:
+        st.checkbox(task, key=f"{athlete}_{today_name}_{task}")
 
-# ----------- Next Day Preview Tab -----------
+# --------------- TAB 2: NEXT DAY -----------------
 with tab2:
-    st.header("Next Day Plan Preview")
-    next_day_plan = weekly_plan[1]
-    st.subheader("Activities")
-    for act in next_day_plan["Activity"]:
-        st.text(act)
-    st.subheader("Nutrition")
-    for meal in next_day_plan["Nutrition"]:
-        st.text(meal)
-    st.subheader("Sleep")
-    st.text(next_day_plan["Sleep"])
-    st.subheader("Tips")
-    for tip in next_day_plan["Tips"]:
-        st.info(tip)
+    next_day = (now + timedelta(days=1)).strftime("%A")
+    st.header(f"Next Day Plan: {next_day}")
+    for task in activity_plan[next_day]:
+        st.write(task)
 
-# ----------- Teams Overview Tab -----------
+# --------------- TAB 3: TEAMS OVERVIEW -----------------
 with tab3:
     st.header("Teams Overview")
     df_progress = pd.DataFrame({
@@ -142,8 +83,35 @@ with tab3:
         "Weekly Completion (%)": [np.random.randint(20,100) for _ in range(3)],
         "Next Week Load (%)": [np.random.randint(20,100) for _ in range(3)]
     })
-    st.dataframe(df_progress.style.format("{:.0f}%").highlight_max(axis=0, color='lightgreen'))
+    def highlight_max(val, column):
+        max_val = df_progress[column].max()
+        return ['background-color: lightgreen' if v==max_val else '' for v in val]
 
-# -------------------- End --------------------
-st.markdown("<hr>", unsafe_allow_html=True)
-st.caption("Ironman Pro Coach App – Personalized Plan | Interactive Checkboxes | Tips & Motivation")
+    styled_df = df_progress.style.apply(highlight_max, column="Weekly Completion (%)", axis=0)\
+                                 .apply(highlight_max, column="Next Week Load (%)", axis=0)\
+                                 .format({"Weekly Completion (%)":"{:.0f}%", "Next Week Load (%)":"{:.0f}%"})
+    st.write(styled_df)
+
+# --------------- TAB 4: TIPS & MOTIVATION -----------------
+with tab4:
+    st.header("Tips & Motivation")
+    tips = [
+        "Consistency is key: Stick to your plan daily.",
+        "Recovery matters: Rest properly to avoid injuries.",
+        "Nutrition fuels performance: Eat balanced meals and hydrate.",
+        "Visualization helps: Imagine crossing the finish line!",
+        "Track your progress weekly and celebrate small wins."
+    ]
+    for t in tips:
+        st.info(t)
+
+# ----------------- NUTRITION & WEIGHT TRACKER -----------------
+st.subheader("Nutrition & Weight Tracker")
+st.write(f"Target Ironman Weight for {athlete}: {ATHLETES[athlete]['weight']} kg")
+weight = st.number_input(f"Current Weight ({athlete})", min_value=40, max_value=120, value=ATHLETES[athlete]['weight'])
+st.write("Sample Meals (Indian-friendly)")
+st.table(pd.DataFrame({
+    "Meal":["Breakfast 7:30","Lunch 13:00","Snack 16:00","Dinner 20:00"],
+    "Menu":["Oats + Milk + Banana","Roti + Sabzi + Dal","Fruits + Nuts","Rice + Dal + Veg + Chicken/Fish"],
+    "Notes":["Protein-rich","Balanced carbs & protein","Energy boost","Recovery meal"]
+}))
